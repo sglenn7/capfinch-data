@@ -1,0 +1,211 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.24.0",
+    "script_metadata_hash": null
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "a526ba82c251c074fa2beb66894e662a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"capfinch-online-platform-synthetic-data-generator\">CapFinch Online Platform \u2014 Synthetic Data Generator</h1>\n<span class=\"paragraph\">Builds a small, internally-consistent fake e-commerce dataset (6 tables) to develop and test\nthe analytics / KPI pipeline <strong>before</strong> the real store launches.</span>\n<span class=\"paragraph\"><strong>Two anchor keys</strong></span>\n<ul>\n<li><code>transaction_id</code> \u2014 PK of <code>orders</code> (one row per completed sale \u2192 revenue, AOV)</li>\n<li><code>customer_id</code> \u2014 PK of <code>customers</code> (one row per person \u2192 repeat rate, demographics)</li>\n</ul>\n<span class=\"paragraph\">They join via <code>customer_id</code> (FK inside <code>orders</code>).</span>\n<span class=\"paragraph\"><strong>Relationship chain</strong>\n<div class=\"language-scdoc codehilite\"><pre><span></span><code>customers \u2500\u252c\u2500 sessions \u2500\u2500 events\n           \u2514\u2500 orders \u2500\u2500 order_items \u2500\u2500 products\n</code></pre></div></span>\n<span class=\"paragraph\"><strong>KPI targets baked into the generator (by construction)</strong>\n| Metric | Target |\n|---|---|\n| Conversion rate (orders / sessions) | ~2% |\n| Cart abandonment (1 \u2212 completed/carts) | ~68% |\n| Repeat purchase (customers with \u22652 orders) | ~20% |</span>\n<span class=\"paragraph\">Everything is produced as a pandas <code>DataFrame</code> first (no CSV yet). Scale up later by raising\n<code>N_CUSTOMERS</code> \u2014 the ratios above are preserved. A commented CSV-export cell is at the bottom.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "a7b3d0f10b4638263b43e91510e474c3",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "02c2752955387280929c52b66a744d1b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"config-kpi-targets\">Config &amp; KPI targets</h2>\n<span class=\"paragraph\"><code>N_CUSTOMERS</code> is the single knob for dataset size. Repeat buyers get a 2nd order, so total\norders \u2248 <code>N_CUSTOMERS \u00d7 (1 + repeat_rate)</code>. Session and cart counts are derived from the orders\nso the conversion (~2%) and abandonment (~68%) targets hold at any scale.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "27b6dd76ce284ddc543dbcd3d4d91f3b",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "5391547b1b82cfdb22a7e2239763df47",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"table-4-products-pk-product_id\">Table 4 \u2014 <code>products</code>  [PK: product_id]</h2>\n<span class=\"paragraph\">Built first because orders/order_items and events reference it.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "d94a69f3bc557ef7d79e93c2ec4902e8",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "8943bd6cb2c55fc70c3b63b48b595756",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"table-1-customers-pk-customer_id\">Table 1 \u2014 <code>customers</code>  [PK: customer_id]</h2>\n<span class=\"paragraph\"><code>total_orders</code> is assigned here (repeat buyers get 2). <code>first_order_date</code> is left blank now and\nfilled in from the actual orders once they exist.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "d7e21a9c78d14a29e0c32e7198f930cf",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "a3a46a028558a25595ba5692bce2f430",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"tables-2-3-orders-and-order_items\">Tables 2 &amp; 3 \u2014 <code>orders</code> and <code>order_items</code></h2>\n<span class=\"paragraph\">Each order expands from a customer's <code>total_orders</code>. Line items drive <code>order_total</code> (= sum of\n<code>line_total</code>) and <code>item_count</code>. Every order also creates its <strong>converting session</strong> so the\nfunnel stays consistent.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "867728f28f017cdf947b57c17d291803",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": "03f87f6427f33f0a0f181a9c1637f6ba",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "2c1b5f15b17ee1c0bee1ecbf3fc4d77d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"table-5-sessions-pk-session_id\">Table 5 \u2014 <code>sessions</code>  [PK: session_id]</h2>\n<span class=\"paragraph\">The converting sessions already exist (one per order). Here we add <strong>abandoned-cart</strong> and\n<strong>browse-only</strong> sessions so the totals hit conversion ~2% and abandonment ~68%:</span>\n<ul>\n<li><code>total_carts = orders / (1 \u2212 0.68)</code> \u2192 abandoned = carts \u2212 orders</li>\n<li><code>total_sessions = orders / 0.02</code> \u2192 browse-only = sessions \u2212 carts</li>\n</ul>\n<span class=\"paragraph\">Some non-converting sessions are anonymous (<code>customer_id = None</code>).</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "726683c0a08416acd8758069d49b4bd1",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "f9d42ea8dfdcb7cc3123f9531127ba9e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"back-fill-first_order_date\">Back-fill <code>first_order_date</code></h3>\n<span class=\"paragraph\">Now that orders exist, set each customer's first order date from their earliest order.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "1563fca7147476bb94e1ce931d7c6ebc",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "5b999adfdd02d1226a104e7dfe11cd4d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"table-6-events-pk-event_id\">Table 6 \u2014 <code>events</code>  [PK: event_id]</h2>\n<span class=\"paragraph\">Funnel detail per session. Every session gets a <code>page_view</code> + some <code>product_view</code>s; sessions\nthat reached the cart add <code>add_to_cart</code> \u2192 <code>checkout_start</code>, and converters end with <code>purchase</code>.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "01e91c3a248f91042022fa0d87994ebe",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "00ae6287df1bce032210b80068820427",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"overview-kpi-check-integrity\">Overview, KPI check &amp; integrity</h2>\n<span class=\"paragraph\">Confirm the six DataFrames, verify the KPI targets, and assert the numeric relationships hold.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Vxnm",
+      "code_hash": "d9468f646f4b6fb7e3d5a34e8503f265",
+      "outputs": [],
+      "console": []
+    },
+    {
+      "id": "DnEU",
+      "code_hash": "070732f10e6f3efa1746749e81cf7e25",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"export-to-csv-optional\">Export to CSV (optional)</h2>\n<span class=\"paragraph\">Everything lives as DataFrames above. Uncomment to write them to a <code>data/</code> folder when ready.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ulZA",
+      "code_hash": "f08e16587c26644030e7d7f64cf626d6",
+      "outputs": [],
+      "console": []
+    }
+  ]
+}
