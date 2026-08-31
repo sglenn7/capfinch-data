@@ -6,12 +6,20 @@ CapFinch is a boutique retail store with a physical location. Today it runs on a
 system and Mailchimp email marketing, and it is launching its **first** e-commerce website with
 **no** historical online data. To build and test the analytics/KPI pipeline before launch, we
 generate a **synthetic dataset** that imitates what real online-platform data (Shopify / Square
-Online / GA4 style) would look like once the site is live.
+Online / GA4 style) would look like once the site is live, alongside the in-store history the
+POS already produces.
+
+Sales therefore arrive from **two channels**. Both land in a single `orders` table tagged with a
+`channel` flag, with channel-specific columns left null on the other side — the same way Square's
+Orders API mixes in-store and Square Online sales. Keeping one fact table means revenue, AOV,
+category mix, and top-seller queries never need a UNION, and "did the website add revenue or just
+move it online?" is a single `GROUP BY channel`.
 
 The dataset is organized around two anchor keys:
 
 - **`transaction_id`** — primary key of `orders`; one row per completed sale (revenue, AOV).
 - **`customer_id`** — primary key of `customers`; one row per person (repeat rate, demographics).
+  **Nullable on `orders`**: most walk-ins are anonymous and some online buyers check out as guests.
 
 These join together via `customer_id`, which is a foreign key inside `orders`. This lets us
 analyze the data both per-sale and per-customer.
@@ -19,9 +27,22 @@ analyze the data both per-sale and per-customer.
 **Relationship chain**
 
 ```
-customers ─┬─ sessions ── events
+customers ─┬─ sessions ── events          (online only)
            └─ orders ── order_items ── products
 ```
+
+**Realism rules the generator enforces**
+
+| Rule | Detail |
+|---|---|
+| Store hours | Open every day 10:00–18:00; no in-store order falls outside that window |
+| In-store time-of-day | Slow morning, lunch bump, late-afternoon peak |
+| In-store day-of-week | Saturday busiest, Mon/Tue slowest |
+| Online time-of-day | 24/7 with a 19:00–22:00 peak and a 02:00–06:00 trough |
+| Timeline | In-store history predates launch; online orders start on `LAUNCH_DATE` |
+| Identity capture | ~68% of in-store orders anonymous; ~12% of online orders are guests |
+| Payment mix | Cash / gift card only in store; PayPal only online |
+| Basket size | Larger in store, mostly single-item online |
 
 ---
 
@@ -29,7 +50,8 @@ customers ─┬─ sessions ── events
 
 **Purpose:** The people dimension. One row per unique customer (the "who"). Square Customer
 Directory equivalent. Anchor for per-person KPIs like repeat purchase rate, age band, and
-location. Every order links back to one row here.
+location. Only people CapFinch can actually identify appear here — anonymous walk-ins never do,
+so not every order links back to a row in this table.
 
 | Field | Type | Key | Description | Example |
 |---|---|---|---|---|
@@ -42,30 +64,60 @@ location. Every order links back to one row here.
 | `zip` | string | | Postal code; finer location grain than state | `23219` |
 | `signup_date` | date | | When the account/email was first created; cohort anchor | `2026-01-15` |
 | `acquisition_source` | string | | How the customer first arrived (organic / mailchimp / social / referral) | `mailchimp` |
-| `first_order_date` | date | | Date of first purchase; null if never bought | `2026-01-20` |
-| `total_orders` | int | | Lifetime completed-order count; ≥2 flags a repeat buyer | `3` |
+| `first_order_date` | date | | Date of first *attributable* purchase, either channel; null if never bought | `2026-01-20` |
+| `total_orders` | int | | Lifetime count of orders attributed to this customer; ≥2 flags a repeat buyer | `3` |
 
 ---
 
 ## Table 2: `orders`
 
 **Purpose:** The transaction fact table (the "what was bought, when, for how much"). One row per
-completed purchase. Square Payments/Orders equivalent. Source for revenue, AOV, and daily sales.
-Header-level only; itemized detail lives in `order_items`.
+completed purchase from **either** channel. Square Payments/Orders equivalent. Source for revenue,
+AOV, daily sales, and channel comparison. Header-level only; itemized detail lives in `order_items`.
+
+### Shared fields (always populated)
 
 | Field | Type | Key | Description | Example |
 |---|---|---|---|---|
-| `transaction_id` | string | PK | Unique ID for one completed order | `TXN_000578` |
-| `customer_id` | string | FK → customers | Which customer placed the order | `CUST_00042` |
-| `session_id` | string | FK → sessions | Which website visit produced this order | `SESS_09912` |
-| `order_date` | timestamp | | Date/time the order was placed; grain for daily KPIs | `2026-03-04 14:22` |
-| `order_total` | decimal | | Total order value; equals sum of `order_items.line_total` minus discount | `84.50` |
-| `item_count` | int | | Number of units in the order | `2` |
-| `payment_method` | string | | Tender type (card / apple_pay / paypal) | `card` |
-| `payment_status` | string | | Processor result (authorized / declined); feeds Payment Success Rate | `authorized` |
-| `shipping_state` | string | | State the order ships to; may differ from home state | `VA` |
+| `transaction_id` | string | PK | Unique ID for one completed order | `TXN00578` |
+| `customer_id` | string | FK → customers (nullable) | Who placed the order; **null** for an anonymous walk-in or guest checkout | `CUST0042` |
+| `channel` | string | | `in_store` or `online`; the flag every channel cut keys off | `in_store` |
+| `order_datetime` | timestamp | | Date/time the order was placed | `2026-03-04 14:22:11` |
+| `order_date` | date | | Date only; grain for daily KPIs | `2026-03-04` |
+| `day_of_week` | string | | Derived from `order_datetime`; weekday/weekend cuts | `Saturday` |
+| `hour_of_day` | int | | Derived; 10–17 in store, 0–23 online | `14` |
+| `subtotal` | decimal | | Sum of the order's `order_items.line_total`, before discount | `84.50` |
 | `discount_amount` | decimal | | Total promo/discount applied; 0 if none | `5.00` |
-| `is_first_order` | bool | | True if the customer's first-ever order | `true` |
+| `order_total` | decimal | | `subtotal − discount_amount + shipping_fee` | `79.50` |
+| `item_count` | int | | Number of units in the order | `2` |
+| `payment_method` | string | | Tender type; vocabulary differs by channel | `card_present` |
+| `payment_status` | string | | Processor result (authorized / declined); feeds Payment Success Rate | `authorized` |
+
+### Online-only fields (null when `channel = 'in_store'`)
+
+| Field | Type | Key | Description | Example |
+|---|---|---|---|---|
+| `session_id` | string | FK → sessions | Which website visit produced this order; the join that powers conversion rate | `SESS009912` |
+| `shipping_state` | string | | State the order ships to; may differ from home state | `VA` |
+| `shipping_zip` | string | | Ship-to postal code | `23219` |
+| `shipping_fee` | decimal | | 0 for pickup or orders over the free-shipping threshold | `6.95` |
+| `fulfillment_type` | string | | `ship` or `pickup_in_store` | `ship` |
+| `promo_code` | string | | Code entered at checkout; ties discounts to campaigns. Null when no discount | `MAILCHIMP15` |
+| `device` | string | | Device used (mobile / desktop / tablet); copied from the session | `mobile` |
+
+### In-store-only fields (null when `channel = 'online'`)
+
+| Field | Type | Key | Description | Example |
+|---|---|---|---|---|
+| `register_id` | string | | Which POS terminal rang the sale | `REG01` |
+| `employee_id` | string | | Cashier; enables sales-per-associate | `EMP03` |
+| `entry_method` | string | | `chip` / `tap` / `swipe`; null for cash | `chip` |
+| `tip_amount` | decimal | | Square tip prompt; usually 0 for retail | `0.00` |
+| `receipt_type` | string | | `email` / `sms` / `printed` / `none`. A digital receipt is what links a walk-in to a customer record | `email` |
+
+> **No `is_first_order` flag.** It is derivable from `customers.first_order_date`, and would be
+> misleading anyway: with most in-store sales anonymous, a customer's true first purchase may never
+> have been attributed.
 
 ---
 
@@ -92,15 +144,38 @@ analysis.
 Catalog equivalent). Attaches category, price, and margin to each line item; supports Inventory
 Sync Accuracy.
 
+CapFinch is a gift-and-everyday boutique: 30 SKUs across six categories, mixing low-ticket
+impulse and gift items with a few higher-ticket anchors.
+
+| Category | Price envelope | Typical items | Gross margin |
+|---|---|---|---|
+| Stationery | ~$5–40 | Cards, notebooks, pens, planners, washi tape | ~50% |
+| Home | ~$24–110 | Candles, vases, frames, diffusers, throws | ~55% |
+| Accessories | ~$18–88 | Jewelry, hats, scarves, small leather goods | ~60% |
+| Kitchen & Table | ~$12–95 | Mugs, tea towels, boards, salt cellars, kettles | ~50% |
+| Bath & Body | ~$8–56 | Soap, hand cream, bath salts, lip balm, body oil | ~60% |
+| Pantry & Treats | ~$6–26 | Honey, chocolate, tea, spiced nuts, jam | ~40% |
+
+Each SKU carries its own narrow price range inside the category envelope, so a greeting card never
+prices out like a planner. Prices snap to retail-looking endings (`.00` / `.50` / `.95`), and stock
+depth runs inverse to price — impulse items are stocked deep, anchors thin.
+
+**Sell-through is deliberately Pareto.** Every SKU gets a popularity weight built from price
+elasticity (cheap impulse items outsell anchors), a hero boost for a handful of designated best
+sellers, and a lognormal taste jitter. That weight drives both what gets bought (`order_items`) and
+what gets browsed (`product_view` events), so top-seller and 80/20 analysis is meaningful and a few
+SKUs land with zero sales — as they would in a real catalog. The weight is a **generator input, not
+a column** on this table; Square's catalog export wouldn't contain it.
+
 | Field | Type | Key | Description | Example |
 |---|---|---|---|---|
-| `product_id` | string | PK | Unique SKU identifier | `PROD_0087` |
-| `product_name` | string | | Human-readable product name | `Linen Scarf` |
-| `category` | string | | Product category; used for Category Mix | `Accessories` |
-| `price` | decimal | | Current list/selling price | `42.25` |
+| `product_id` | string | PK | Unique SKU identifier | `PROD0006` |
+| `product_name` | string | | Human-readable product name | `Soy Wax Candle` |
+| `category` | string | | One of the six categories above; used for Category Mix | `Home` |
+| `price` | decimal | | Current list/selling price | `34.00` |
 | `price_band` | string | | Pre-bucketed price tier (<$25 / $25-75 / $75+) | `$25-75` |
-| `cost` | decimal | | Unit cost; enables margin and break-even AOV | `18.00` |
-| `stock_on_hand` | int | | Current inventory units; feeds Inventory Sync Accuracy | `120` |
+| `cost` | decimal | | Unit cost; ratio to price varies by category | `16.53` |
+| `stock_on_hand` | int | | Current inventory units; feeds Inventory Sync Accuracy | `32` |
 
 ---
 
@@ -108,7 +183,8 @@ Sync Accuracy.
 
 **Purpose:** The web-traffic layer (the "visits," including browsers who never bought). One row
 per site visit. The piece a physical POS lacks; without it Conversion Rate and Cart Abandonment
-cannot be computed. Denominator for the funnel.
+cannot be computed. Denominator for the funnel — and **online only**: in-store orders appear on
+neither side of the conversion ratio. All sessions fall on or after the site launch date.
 
 | Field | Type | Key | Description | Example |
 |---|---|---|---|---|
@@ -141,9 +217,27 @@ fired event. Needed only for Event Tracking Coverage and funnel drop-off analysi
 
 ## Data Integrity Rules
 
-- `orders.order_total` = sum(`order_items.line_total`) − `discount_amount`
+**Money**
 - `order_items.line_total` = `quantity × unit_price`
-- Every `orders.customer_id` and `orders.session_id` must exist in `customers` / `sessions`
-- A session with `converted = true` has exactly one matching row in `orders`
-- `customers.total_orders` = count of that customer's rows in `orders`
+- `orders.subtotal` = sum(`order_items.line_total`) for that `transaction_id`
+- `orders.order_total` = `subtotal − discount_amount + shipping_fee` (shipping treated as 0 in store)
+
+**Keys**
+- Every non-null `orders.customer_id` must exist in `customers`
+- Every `orders.session_id` must exist in `sessions`
+- `customers.total_orders` = count of that customer's rows in `orders`, across both channels
+- `customers.first_order_date` = earliest `order_datetime` attributed to that customer
+
+**Channel**
+- `channel = 'in_store'` → all online-only fields are null and no session exists
+- `channel = 'online'` → `session_id` is non-null and that session has `converted = true`
+- A session with `converted = true` has exactly one matching online row in `orders`
+- Count of converted sessions = count of online orders
+
+**Timing**
+- In-store `hour_of_day` is between 10 and 17 inclusive (store open 10:00–18:00)
+- No online order predates the site launch date
+
+**Funnel (online only)**
+- Conversion rate = online orders / total sessions; in-store orders are excluded
 - Only sessions with `reached_cart = true` count in the abandonment denominator

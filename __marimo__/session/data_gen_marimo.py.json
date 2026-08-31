@@ -8,17 +8,24 @@
     {
       "id": "Hbol",
       "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "MJUe",
-      "code_hash": "a526ba82c251c074fa2beb66894e662a",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"capfinch-online-platform-synthetic-data-generator\">CapFinch Online Platform \u2014 Synthetic Data Generator</h1>\n<span class=\"paragraph\">Builds a small, internally-consistent fake e-commerce dataset (6 tables) to develop and test\nthe analytics / KPI pipeline <strong>before</strong> the real store launches.</span>\n<span class=\"paragraph\"><strong>Two anchor keys</strong></span>\n<ul>\n<li><code>transaction_id</code> \u2014 PK of <code>orders</code> (one row per completed sale \u2192 revenue, AOV)</li>\n<li><code>customer_id</code> \u2014 PK of <code>customers</code> (one row per person \u2192 repeat rate, demographics)</li>\n</ul>\n<span class=\"paragraph\">They join via <code>customer_id</code> (FK inside <code>orders</code>).</span>\n<span class=\"paragraph\"><strong>Relationship chain</strong>\n<div class=\"language-scdoc codehilite\"><pre><span></span><code>customers \u2500\u252c\u2500 sessions \u2500\u2500 events\n           \u2514\u2500 orders \u2500\u2500 order_items \u2500\u2500 products\n</code></pre></div></span>\n<span class=\"paragraph\"><strong>KPI targets baked into the generator (by construction)</strong>\n| Metric | Target |\n|---|---|\n| Conversion rate (orders / sessions) | ~2% |\n| Cart abandonment (1 \u2212 completed/carts) | ~68% |\n| Repeat purchase (customers with \u22652 orders) | ~20% |</span>\n<span class=\"paragraph\">Everything is produced as a pandas <code>DataFrame</code> first (no CSV yet). Scale up later by raising\n<code>N_CUSTOMERS</code> \u2014 the ratios above are preserved. A commented CSV-export cell is at the bottom.</span></span>"
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "7e204280330d5a0ebe26a06588024f25",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"capfinch-synthetic-omnichannel-data-generator\">CapFinch \u2014 Synthetic Omnichannel Data Generator</h1>\n<span class=\"paragraph\">Builds a small, internally-consistent fake dataset (6 tables) to develop and test the\nanalytics / KPI pipeline <strong>before</strong> the e-commerce site launches.</span>\n<span class=\"paragraph\">CapFinch has run a physical store on <strong>Square POS</strong> for a while and is now launching its\nfirst website, so transactions arrive from two sources. Both land in a <strong>single <code>orders</code>\ntable</strong> tagged with a <code>channel</code> flag, with channel-specific columns left null on the other\nside \u2014 the same way Square's Orders API mixes in-store and Square Online sales.</span>\n<span class=\"paragraph\"><strong>Two anchor keys</strong></span>\n<ul>\n<li><code>transaction_id</code> \u2014 PK of <code>orders</code> (one row per completed sale \u2192 revenue, AOV)</li>\n<li><code>customer_id</code> \u2014 PK of <code>customers</code> (one row per person \u2192 repeat rate, demographics).\n  <strong>Nullable on <code>orders</code></strong>: most walk-ins are anonymous, and some online buyers check out as guests.</li>\n</ul>\n<span class=\"paragraph\"><strong>Relationship chain</strong>\n<div class=\"language-scdoc codehilite\"><pre><span></span><code>customers \u2500\u252c\u2500 sessions \u2500\u2500 events          (online only)\n           \u2514\u2500 orders \u2500\u2500 order_items \u2500\u2500 products\n</code></pre></div></span>\n<span class=\"paragraph\"><strong>Realism rules baked in</strong>\n| Rule | Detail |\n|---|---|\n| Store hours | Open every day 10:00\u201318:00; no in-store order outside that window |\n| In-store time-of-day | Slow morning, lunch bump, late-afternoon peak |\n| In-store day-of-week | Saturday busiest, Mon/Tue slowest |\n| Online time-of-day | 24/7 with a 19:00\u201322:00 peak and a 02:00\u201306:00 trough |\n| Timeline | In-store history predates launch; online orders start on <code>LAUNCH_DATE</code> |\n| Identity capture | ~68% of in-store orders anonymous; ~12% of online orders are guests |\n| Payment mix | Cash/gift card only in store; PayPal only online |\n| Basket size | Larger in store, mostly single-item online |</span>\n<span class=\"paragraph\"><strong>KPI targets (funnel metrics are online-only by construction)</strong>\n| Metric | Target |\n|---|---|\n| Conversion rate (online orders / sessions) | ~2% |\n| Cart abandonment (1 \u2212 completed/carts) | ~68% |\n| Repeat purchase (customers with \u22652 attributable orders) | ~20% |</span>\n<span class=\"paragraph\">Everything is produced as a pandas <code>DataFrame</code> first (no CSV yet). Scale up later by raising\n<code>N_CUSTOMERS</code> \u2014 the ratios above are preserved. A commented CSV-export cell is at the bottom.</span></span>"
           }
         }
       ],
@@ -26,18 +33,32 @@
     },
     {
       "id": "vblA",
-      "code_hash": "a7b3d0f10b4638263b43e91510e474c3",
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "bkHC",
-      "code_hash": "02c2752955387280929c52b66a744d1b",
+      "code_hash": "0734a5ad847a7378369c33aa8bb03eb8",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"config-kpi-targets\">Config &amp; KPI targets</h2>\n<span class=\"paragraph\"><code>N_CUSTOMERS</code> is the single knob for dataset size. Repeat buyers get a 2nd order, so total\norders \u2248 <code>N_CUSTOMERS \u00d7 (1 + repeat_rate)</code>. Session and cart counts are derived from the orders\nso the conversion (~2%) and abandonment (~68%) targets hold at any scale.</span></span>"
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Libraries ready.\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "b439b250e86c48b87b9b518d48e1e375",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"config-timeline-kpi-targets\">Config, timeline &amp; KPI targets</h2>\n<span class=\"paragraph\"><code>N_CUSTOMERS</code> is the single knob for dataset size. Repeat buyers get a 2nd order, so\n<em>attributable</em> orders \u2248 <code>N_CUSTOMERS \u00d7 (1 + repeat_rate)</code>; anonymous walk-ins and guest\ncheckouts are then layered on top to hit the identity-capture rates. Session and cart counts\nare derived from the <strong>online</strong> orders only, so conversion (~2%) and abandonment (~68%) hold\nat any scale.</span></span>"
           }
         }
       ],
@@ -45,18 +66,32 @@
     },
     {
       "id": "lEQa",
-      "code_hash": "27b6dd76ce284ddc543dbcd3d4d91f3b",
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "PKri",
-      "code_hash": "5391547b1b82cfdb22a7e2239763df47",
+      "code_hash": "ed2a4afe7620d24a4311c01253b587f2",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"table-4-products-pk-product_id\">Table 4 \u2014 <code>products</code>  [PK: product_id]</h2>\n<span class=\"paragraph\">Built first because orders/order_items and events reference it.</span></span>"
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Config: 15 customers (3 repeat buyers), 30 products\nHistory 2025-02-28 -> 2026-08-31  |  site launched 2026-05-31\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "PKri",
+      "code_hash": "29595c03d4f69373cb24c69d9f3fe1d5",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"timestamp-sampling\">Timestamp sampling</h2>\n<span class=\"paragraph\">The single most visible tell of synthetic transaction data is uniformly-spread timestamps.\n<code>sample_datetime</code> draws a day weighted by day-of-week, then an hour weighted by time-of-day,\nusing a different shape per channel. In-store draws are confined to store hours, and the\nclosing hour is tapered because nobody walks in at 17:55.</span></span>"
           }
         }
       ],
@@ -64,18 +99,32 @@
     },
     {
       "id": "Xref",
-      "code_hash": "d94a69f3bc557ef7d79e93c2ec4902e8",
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "SFPL",
-      "code_hash": "8943bd6cb2c55fc70c3b63b48b595756",
+      "code_hash": "fc27828e62ac9e536123b654157d297a",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"table-1-customers-pk-customer_id\">Table 1 \u2014 <code>customers</code>  [PK: customer_id]</h2>\n<span class=\"paragraph\"><code>total_orders</code> is assigned here (repeat buyers get 2). <code>first_order_date</code> is left blank now and\nfilled in from the actual orders once they exist.</span></span>"
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "In-store hour range: 10 - 17 (store open 10-18)\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "f185a87d8871aa363c87959a6d95d076",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"table-4-products-pk-product_id\">Table 4 \u2014 <code>products</code>  [PK: product_id]</h2>\n<span class=\"paragraph\">Built first because orders/order_items and events reference it.</span>\n<span class=\"paragraph\">CapFinch is a gift-and-everyday boutique, so the catalog spans six categories mixing low-ticket\nimpulse/gift items with a few higher-ticket anchors:</span>\n<table>\n<thead>\n<tr>\n<th>Category</th>\n<th>Envelope</th>\n<th>What's in it</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>Stationery</td>\n<td>~$5\u201340</td>\n<td>Cards, notebooks, pens, planners, washi tape</td>\n</tr>\n<tr>\n<td>Home</td>\n<td>~$24\u2013110</td>\n<td>Candles, vases, frames, diffusers, throws</td>\n</tr>\n<tr>\n<td>Accessories</td>\n<td>~$18\u201388</td>\n<td>Jewelry, hats, scarves, small leather goods</td>\n</tr>\n<tr>\n<td>Kitchen &amp; Table</td>\n<td>~$12\u201395</td>\n<td>Mugs, tea towels, boards, salt cellars, kettles</td>\n</tr>\n<tr>\n<td>Bath &amp; Body</td>\n<td>~$8\u201356</td>\n<td>Soap, hand cream, bath salts, lip balm, body oil</td>\n</tr>\n<tr>\n<td>Pantry &amp; Treats</td>\n<td>~$6\u201326</td>\n<td>Honey, chocolate, tea, spiced nuts, jam</td>\n</tr>\n</tbody>\n</table>\n<span class=\"paragraph\">Each product carries its own narrow price range rather than drawing from the whole category\nenvelope \u2014 a greeting card should never price out at $38. Prices are then snapped to retail-looking\nendings (<code>.00</code> / <code>.50</code> / <code>.95</code>). Cost ratios vary by category: jewelry and bath carry the best\nmargin, pantry food the worst. Stock depth is inverse to price \u2014 cheap impulse items are stocked\ndeep, high-ticket anchors are stocked thin.</span></span>"
           }
         }
       ],
@@ -83,18 +132,32 @@
     },
     {
       "id": "BYtC",
-      "code_hash": "d7e21a9c78d14a29e0c32e7198f930cf",
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "RGSE",
-      "code_hash": "a3a46a028558a25595ba5692bce2f430",
+      "code_hash": "b3f5b8ccfe08550e6c2c78a22272444b",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"tables-2-3-orders-and-order_items\">Tables 2 &amp; 3 \u2014 <code>orders</code> and <code>order_items</code></h2>\n<span class=\"paragraph\">Each order expands from a customer's <code>total_orders</code>. Line items drive <code>order_total</code> (= sum of\n<code>line_total</code>) and <code>item_count</code>. Every order also creates its <strong>converting session</strong> so the\nfunnel stays consistent.</span></span>"
+            "text/html": "<marimo-ui-element object-id='BYtC-0' random-id='19735824-0ef3-8e3a-7375-779ad088ebfc'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0001&#92;&quot;,&#92;&quot;product_name&#92;&quot;:&#92;&quot;Letterpress Greeting Card&#92;&quot;,&#92;&quot;category&#92;&quot;:&#92;&quot;Stationery&#92;&quot;,&#92;&quot;price&#92;&quot;:6.95,&#92;&quot;price_band&#92;&quot;:&#92;&quot;&#92;u003c&#36;25&#92;&quot;,&#92;&quot;cost&#92;&quot;:3.7,&#92;&quot;stock_on_hand&#92;&quot;:176},{&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0002&#92;&quot;,&#92;&quot;product_name&#92;&quot;:&#92;&quot;A5 Linen Notebook&#92;&quot;,&#92;&quot;category&#92;&quot;:&#92;&quot;Stationery&#92;&quot;,&#92;&quot;price&#92;&quot;:21.95,&#92;&quot;price_band&#92;&quot;:&#92;&quot;&#92;u003c&#36;25&#92;&quot;,&#92;&quot;cost&#92;&quot;:10.26,&#92;&quot;stock_on_hand&#92;&quot;:160},{&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0003&#92;&quot;,&#92;&quot;product_name&#92;&quot;:&#92;&quot;Brass Fountain Pen&#92;&quot;,&#92;&quot;category&#92;&quot;:&#92;&quot;Stationery&#92;&quot;,&#92;&quot;price&#92;&quot;:38.95,&#92;&quot;price_band&#92;&quot;:&#92;&quot;&#36;25-75&#92;&quot;,&#92;&quot;cost&#92;&quot;:18.9,&#92;&quot;stock_on_hand&#92;&quot;:37},{&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0004&#92;&quot;,&#92;&quot;product_name&#92;&quot;:&#92;&quot;Weekly Desk Planner&#92;&quot;,&#92;&quot;category&#92;&quot;:&#92;&quot;Stationery&#92;&quot;,&#92;&quot;price&#92;&quot;:21.0,&#92;&quot;price_band&#92;&quot;:&#92;&quot;&#92;u003c&#36;25&#92;&quot;,&#92;&quot;cost&#92;&quot;:10.99,&#92;&quot;stock_on_hand&#92;&quot;:139},{&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0005&#92;&quot;,&#92;&quot;product_name&#92;&quot;:&#92;&quot;Washi Tape Trio&#92;&quot;,&#92;&quot;category&#92;&quot;:&#92;&quot;Stationery&#92;&quot;,&#92;&quot;price&#92;&quot;:12.0,&#92;&quot;price_band&#92;&quot;:&#92;&quot;&#92;u003c&#36;25&#92;&quot;,&#92;&quot;cost&#92;&quot;:5.51,&#92;&quot;stock_on_hand&#92;&quot;:108},{&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0006&#92;&quot;,&#92;&quot;product_name&#92;&quot;:&#92;&quot;Soy Wax Candle&#92;&quot;,&#92;&quot;category&#92;&quot;:&#92;&quot;Home&#92;&quot;,&#92;&quot;price&#92;&quot;:34.0,&#92;&quot;price_band&#92;&quot;:&#92;&quot;&#36;25-75&#92;&quot;,&#92;&quot;cost&#92;&quot;:16.53,&#92;&quot;stock_on_hand&#92;&quot;:32},{&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0007&#92;&quot;,&#92;&quot;product_name&#92;&quot;:&#92;&quot;Speckled Ceramic Vase&#92;&quot;,&#92;&quot;category&#92;&quot;:&#92;&quot;Home&#92;&quot;,&#92;&quot;price&#92;&quot;:34.0,&#92;&quot;price_band&#92;&quot;:&#92;&quot;&#36;25-75&#92;&quot;,&#92;&quot;cost&#92;&quot;:15.78,&#92;&quot;stock_on_hand&#92;&quot;:39},{&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0008&#92;&quot;,&#92;&quot;product_name&#92;&quot;:&#92;&quot;Linen Throw Blanket&#92;&quot;,&#92;&quot;category&#92;&quot;:&#92;&quot;Home&#92;&quot;,&#92;&quot;price&#92;&quot;:98.0,&#92;&quot;price_band&#92;&quot;:&#92;&quot;&#36;75+&#92;&quot;,&#92;&quot;cost&#92;&quot;:41.72,&#92;&quot;stock_on_hand&#92;&quot;:15},{&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0009&#92;&quot;,&#92;&quot;product_name&#92;&quot;:&#92;&quot;Brass Picture Frame&#92;&quot;,&#92;&quot;category&#92;&quot;:&#92;&quot;Home&#92;&quot;,&#92;&quot;price&#92;&quot;:30.5,&#92;&quot;price_band&#92;&quot;:&#92;&quot;&#36;25-75&#92;&quot;,&#92;&quot;cost&#92;&quot;:15.21,&#92;&quot;stock_on_hand&#92;&quot;:46},{&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0010&#92;&quot;,&#92;&quot;product_name&#92;&quot;:&#92;&quot;Reed Diffuser&#92;&quot;,&#92;&quot;category&#92;&quot;:&#92;&quot;Home&#92;&quot;,&#92;&quot;price&#92;&quot;:41.5,&#92;&quot;price_band&#92;&quot;:&#92;&quot;&#36;25-75&#92;&quot;,&#92;&quot;cost&#92;&quot;:18.44,&#92;&quot;stock_on_hand&#92;&quot;:50}]&quot;' data-total-rows='30' data-total-columns='7' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='true' data-page-size='10' data-field-types='[[&quot;product_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;product_name&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;category&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;price&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;price_band&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;cost&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;stock_on_hand&quot;,[&quot;integer&quot;,&quot;int64&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='true' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "30 SKUs across 6 categories\n                 skus    low   high  avg_margin\ncategory                                       \nAccessories         5  22.50  80.00        0.61\nBath & Body         5   9.95  50.00        0.61\nHome                5  30.50  98.00        0.54\nKitchen & Table     5  13.50  93.50        0.51\nPantry & Treats     5   6.50  20.00        0.41\nStationery          5   6.95  38.95        0.51\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "f8ea42af524275ae5ea3cbe4d52eef7e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"sell-through-weights-best-sellers\">Sell-through weights (best sellers)</h3>\n<span class=\"paragraph\">Real boutique sales are heavily Pareto \u2014 a handful of SKUs drive most units. Picking products\nuniformly would flatten that and make top-seller and 80/20 analysis meaningless, so every SKU gets\na <strong>popularity weight</strong> built from three things:</span>\n<ol>\n<li><strong>Price elasticity</strong> \u2014 cheap impulse items outsell expensive anchors, as <code>(median_price / price) ** 0.6</code></li>\n<li><strong>Hero boost</strong> \u2014 a few deliberate best sellers get a multiplier, so the ranking isn't purely\n   \"cheapest wins\" (the gold hoops sell well <em>despite</em> being one of the pricier SKUs)</li>\n<li><strong>Taste jitter</strong> \u2014 a lognormal wobble so the order isn't perfectly predictable from price</li>\n</ol>\n<span class=\"paragraph\">These weights drive both what gets bought (<code>order_items</code>) and what gets browsed (<code>product_view</code>\nevents). They are a generator input, not a column on <code>products</code> \u2014 Square's catalog wouldn't\nexport them.</span></span>"
           }
         }
       ],
@@ -102,24 +165,45 @@
     },
     {
       "id": "Kclp",
-      "code_hash": "867728f28f017cdf947b57c17d291803",
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "emfo",
-      "code_hash": "03f87f6427f33f0a0f181a9c1637f6ba",
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "Hstk",
-      "code_hash": "2c1b5f15b17ee1c0bee1ecbf3fc4d77d",
+      "code_hash": "b884c5010912919f57d84b563071984d",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"table-5-sessions-pk-session_id\">Table 5 \u2014 <code>sessions</code>  [PK: session_id]</h2>\n<span class=\"paragraph\">The converting sessions already exist (one per order). Here we add <strong>abandoned-cart</strong> and\n<strong>browse-only</strong> sessions so the totals hit conversion ~2% and abandonment ~68%:</span>\n<ul>\n<li><code>total_carts = orders / (1 \u2212 0.68)</code> \u2192 abandoned = carts \u2212 orders</li>\n<li><code>total_sessions = orders / 0.02</code> \u2192 browse-only = sessions \u2212 carts</li>\n</ul>\n<span class=\"paragraph\">Some non-converting sessions are anonymous (<code>customer_id = None</code>).</span></span>"
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Top 8 by expected sell-through\n             product_name        category  price share\nLetterpress Greeting Card      Stationery   6.95 16.7%\n            Stoneware Mug Kitchen & Table  21.00 10.4%\n       Gold Vermeil Hoops     Accessories  48.95  8.2%\n   Sea Salt Chocolate Bar Pantry & Treats   6.50  5.9%\n          Tinted Lip Balm     Bath & Body   9.95  4.6%\n         Oatmeal Soap Bar     Bath & Body  10.00  4.5%\n          Shea Hand Cream     Bath & Body  18.95  4.5%\n      Weekly Desk Planner      Stationery  21.00  4.1%\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "emfo",
+      "code_hash": "215070a05f1afe031b9c3d5297bb2494",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"table-1-customers-pk-customer_id\">Table 1 \u2014 <code>customers</code>  [PK: customer_id]</h2>\n<span class=\"paragraph\">Only people CapFinch can actually identify (Square Customer Directory / Mailchimp audience).\n<code>total_orders</code> is assigned here and counts <strong>attributable</strong> orders only \u2014 repeat buyers get 2.\nAnonymous walk-ins never appear in this table. <code>signup_date</code> is drawn inside the history\nwindow so every customer exists before their first order; <code>first_order_date</code> is filled in\nfrom the actual orders once they exist.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "5604792ba2f7983f6d969ea429e2e0ad",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='Hstk-0' random-id='40fb80f6-4eea-75bd-a575-04e556fd48c7'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0001&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;johnsonjoshua@example.org&#92;&quot;,&#92;&quot;age&#92;&quot;:29,&#92;&quot;age_band&#92;&quot;:&#92;&quot;25-34&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;female&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;DC&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;97031&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2025-07-05&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;organic&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;NaT&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0002&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;rhodespatricia@example.org&#92;&quot;,&#92;&quot;age&#92;&quot;:49,&#92;&quot;age_band&#92;&quot;:&#92;&quot;45+&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;female&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;OR&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;55803&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2025-05-30&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;mailchimp&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;NaT&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0003&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;johnsonjeffery@example.net&#92;&quot;,&#92;&quot;age&#92;&quot;:30,&#92;&quot;age_band&#92;&quot;:&#92;&quot;25-34&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;female&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;PA&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;03979&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2026-05-20&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;organic&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;NaT&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0004&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;jennifermiles@example.com&#92;&quot;,&#92;&quot;age&#92;&quot;:23,&#92;&quot;age_band&#92;&quot;:&#92;&quot;18-24&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;nonbinary&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;IN&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;59379&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2025-04-11&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;mailchimp&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;NaT&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0005&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;lisa02@example.net&#92;&quot;,&#92;&quot;age&#92;&quot;:19,&#92;&quot;age_band&#92;&quot;:&#92;&quot;18-24&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;nonbinary&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;NE&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;45098&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2025-04-28&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;referral&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;NaT&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0006&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;eric51@example.org&#92;&quot;,&#92;&quot;age&#92;&quot;:40,&#92;&quot;age_band&#92;&quot;:&#92;&quot;35-44&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;female&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;MS&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;13177&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2026-06-09&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;referral&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;NaT&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0007&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;melanie94@example.org&#92;&quot;,&#92;&quot;age&#92;&quot;:48,&#92;&quot;age_band&#92;&quot;:&#92;&quot;45+&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;nonbinary&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;VA&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;60718&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2026-07-29&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;social&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;NaT&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0008&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;dudleynicholas@example.net&#92;&quot;,&#92;&quot;age&#92;&quot;:36,&#92;&quot;age_band&#92;&quot;:&#92;&quot;35-44&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;female&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;LA&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;82898&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2026-02-07&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;mailchimp&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;NaT&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:2},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0009&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;barbara10@example.net&#92;&quot;,&#92;&quot;age&#92;&quot;:19,&#92;&quot;age_band&#92;&quot;:&#92;&quot;18-24&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;nonbinary&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;IN&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;38431&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2026-03-16&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;referral&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;NaT&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0010&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;wyattmichelle@example.com&#92;&quot;,&#92;&quot;age&#92;&quot;:28,&#92;&quot;age_band&#92;&quot;:&#92;&quot;25-34&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;male&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;KY&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;59930&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2025-11-07&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;social&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;NaT&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1}]&quot;' data-total-rows='15' data-total-columns='11' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='true' data-page-size='10' data-field-types='[[&quot;customer_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;email&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;age&quot;,[&quot;integer&quot;,&quot;int64&quot;]],[&quot;age_band&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;gender&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;state&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;zip&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;signup_date&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;acquisition_source&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;first_order_date&quot;,[&quot;datetime&quot;,&quot;datetime64[s]&quot;]],[&quot;total_orders&quot;,[&quot;integer&quot;,&quot;int64&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='true' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
           }
         }
       ],
@@ -127,31 +211,111 @@
     },
     {
       "id": "nWHF",
-      "code_hash": "726683c0a08416acd8758069d49b4bd1",
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "iLit",
-      "code_hash": "f9d42ea8dfdcb7cc3123f9531127ba9e",
+      "code_hash": "d46433770b7ec2bb5c6f95b1204d5185",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"back-fill-first_order_date\">Back-fill <code>first_order_date</code></h3>\n<span class=\"paragraph\">Now that orders exist, set each customer's first order date from their earliest order.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"tables-2-3-orders-and-order_items\">Tables 2 &amp; 3 \u2014 <code>orders</code> and <code>order_items</code></h2>\n<span class=\"paragraph\">One <code>orders</code> row per completed sale from <strong>either</strong> channel, distinguished by <code>channel</code>.\nChannel-specific columns stay null on the other side:</span>\n<ul>\n<li><strong>online only</strong> \u2014 <code>session_id</code>, <code>shipping_state</code>, <code>shipping_zip</code>, <code>shipping_fee</code>,\n  <code>fulfillment_type</code>, <code>promo_code</code>, <code>device</code></li>\n<li><strong>in-store only</strong> \u2014 <code>register_id</code>, <code>employee_id</code>, <code>entry_method</code>, <code>tip_amount</code>, <code>receipt_type</code></li>\n</ul>\n<span class=\"paragraph\">Money: <code>order_total = subtotal \u2212 discount_amount + shipping_fee</code>, where <code>subtotal</code> is the sum\nof the order's <code>order_items.line_total</code>.</span>\n<span class=\"paragraph\">Orders are built in two passes: first the attributable ones expanded from each customer's\n<code>total_orders</code>, then anonymous walk-ins and guest checkouts layered on top to hit the\nidentity-capture rates. Only online orders create a converting session.</span></span>"
           }
         }
       ],
       "console": []
     },
     {
+      "id": "iLit",
+      "code_hash": "7217162135321d25c6add9a75b7b127f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='iLit-0' random-id='f8bc69d1-dcf7-fb8d-68d2-1410e3e5e0fa'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;Index0&#92;&quot;:0,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00032&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;channel&#92;&quot;:&#92;&quot;in_store&#92;&quot;,&#92;&quot;order_datetime&#92;&quot;:&#92;&quot;2025-04-03 14:59:58&#92;&quot;,&#92;&quot;order_date&#92;&quot;:&#92;&quot;2025-04-03&#92;&quot;,&#92;&quot;day_of_week&#92;&quot;:&#92;&quot;Thursday&#92;&quot;,&#92;&quot;hour_of_day&#92;&quot;:14,&#92;&quot;subtotal&#92;&quot;:52.8,&#92;&quot;discount_amount&#92;&quot;:0.0,&#92;&quot;item_count&#92;&quot;:4,&#92;&quot;payment_method&#92;&quot;:&#92;&quot;card_present&#92;&quot;,&#92;&quot;payment_status&#92;&quot;:&#92;&quot;authorized&#92;&quot;,&#92;&quot;session_id&#92;&quot;:NaN,&#92;&quot;shipping_state&#92;&quot;:NaN,&#92;&quot;shipping_zip&#92;&quot;:NaN,&#92;&quot;shipping_fee&#92;&quot;:NaN,&#92;&quot;fulfillment_type&#92;&quot;:NaN,&#92;&quot;promo_code&#92;&quot;:NaN,&#92;&quot;device&#92;&quot;:NaN,&#92;&quot;register_id&#92;&quot;:&#92;&quot;REG01&#92;&quot;,&#92;&quot;employee_id&#92;&quot;:&#92;&quot;EMP02&#92;&quot;,&#92;&quot;entry_method&#92;&quot;:&#92;&quot;tap&#92;&quot;,&#92;&quot;tip_amount&#92;&quot;:0.0,&#92;&quot;receipt_type&#92;&quot;:&#92;&quot;none&#92;&quot;,&#92;&quot;order_total&#92;&quot;:52.8},{&#92;&quot;Index0&#92;&quot;:1,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00019&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;channel&#92;&quot;:&#92;&quot;in_store&#92;&quot;,&#92;&quot;order_datetime&#92;&quot;:&#92;&quot;2025-04-19 15:03:28&#92;&quot;,&#92;&quot;order_date&#92;&quot;:&#92;&quot;2025-04-19&#92;&quot;,&#92;&quot;day_of_week&#92;&quot;:&#92;&quot;Saturday&#92;&quot;,&#92;&quot;hour_of_day&#92;&quot;:15,&#92;&quot;subtotal&#92;&quot;:242.9,&#92;&quot;discount_amount&#92;&quot;:0.0,&#92;&quot;item_count&#92;&quot;:6,&#92;&quot;payment_method&#92;&quot;:&#92;&quot;apple_pay&#92;&quot;,&#92;&quot;payment_status&#92;&quot;:&#92;&quot;authorized&#92;&quot;,&#92;&quot;session_id&#92;&quot;:NaN,&#92;&quot;shipping_state&#92;&quot;:NaN,&#92;&quot;shipping_zip&#92;&quot;:NaN,&#92;&quot;shipping_fee&#92;&quot;:NaN,&#92;&quot;fulfillment_type&#92;&quot;:NaN,&#92;&quot;promo_code&#92;&quot;:NaN,&#92;&quot;device&#92;&quot;:NaN,&#92;&quot;register_id&#92;&quot;:&#92;&quot;REG01&#92;&quot;,&#92;&quot;employee_id&#92;&quot;:&#92;&quot;EMP02&#92;&quot;,&#92;&quot;entry_method&#92;&quot;:&#92;&quot;tap&#92;&quot;,&#92;&quot;tip_amount&#92;&quot;:0.0,&#92;&quot;receipt_type&#92;&quot;:&#92;&quot;printed&#92;&quot;,&#92;&quot;order_total&#92;&quot;:242.9},{&#92;&quot;Index0&#92;&quot;:2,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00031&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;channel&#92;&quot;:&#92;&quot;in_store&#92;&quot;,&#92;&quot;order_datetime&#92;&quot;:&#92;&quot;2025-05-16 15:56:01&#92;&quot;,&#92;&quot;order_date&#92;&quot;:&#92;&quot;2025-05-16&#92;&quot;,&#92;&quot;day_of_week&#92;&quot;:&#92;&quot;Friday&#92;&quot;,&#92;&quot;hour_of_day&#92;&quot;:15,&#92;&quot;subtotal&#92;&quot;:54.0,&#92;&quot;discount_amount&#92;&quot;:0.0,&#92;&quot;item_count&#92;&quot;:3,&#92;&quot;payment_method&#92;&quot;:&#92;&quot;cash&#92;&quot;,&#92;&quot;payment_status&#92;&quot;:&#92;&quot;authorized&#92;&quot;,&#92;&quot;session_id&#92;&quot;:NaN,&#92;&quot;shipping_state&#92;&quot;:NaN,&#92;&quot;shipping_zip&#92;&quot;:NaN,&#92;&quot;shipping_fee&#92;&quot;:NaN,&#92;&quot;fulfillment_type&#92;&quot;:NaN,&#92;&quot;promo_code&#92;&quot;:NaN,&#92;&quot;device&#92;&quot;:NaN,&#92;&quot;register_id&#92;&quot;:&#92;&quot;REG01&#92;&quot;,&#92;&quot;employee_id&#92;&quot;:&#92;&quot;EMP01&#92;&quot;,&#92;&quot;entry_method&#92;&quot;:NaN,&#92;&quot;tip_amount&#92;&quot;:0.0,&#92;&quot;receipt_type&#92;&quot;:&#92;&quot;none&#92;&quot;,&#92;&quot;order_total&#92;&quot;:54.0},{&#92;&quot;Index0&#92;&quot;:3,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00022&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;channel&#92;&quot;:&#92;&quot;in_store&#92;&quot;,&#92;&quot;order_datetime&#92;&quot;:&#92;&quot;2025-06-06 16:46:13&#92;&quot;,&#92;&quot;order_date&#92;&quot;:&#92;&quot;2025-06-06&#92;&quot;,&#92;&quot;day_of_week&#92;&quot;:&#92;&quot;Friday&#92;&quot;,&#92;&quot;hour_of_day&#92;&quot;:16,&#92;&quot;subtotal&#92;&quot;:116.85,&#92;&quot;discount_amount&#92;&quot;:5.84,&#92;&quot;item_count&#92;&quot;:5,&#92;&quot;payment_method&#92;&quot;:&#92;&quot;card_present&#92;&quot;,&#92;&quot;payment_status&#92;&quot;:&#92;&quot;authorized&#92;&quot;,&#92;&quot;session_id&#92;&quot;:NaN,&#92;&quot;shipping_state&#92;&quot;:NaN,&#92;&quot;shipping_zip&#92;&quot;:NaN,&#92;&quot;shipping_fee&#92;&quot;:NaN,&#92;&quot;fulfillment_type&#92;&quot;:NaN,&#92;&quot;promo_code&#92;&quot;:NaN,&#92;&quot;device&#92;&quot;:NaN,&#92;&quot;register_id&#92;&quot;:&#92;&quot;REG02&#92;&quot;,&#92;&quot;employee_id&#92;&quot;:&#92;&quot;EMP01&#92;&quot;,&#92;&quot;entry_method&#92;&quot;:&#92;&quot;tap&#92;&quot;,&#92;&quot;tip_amount&#92;&quot;:5.84,&#92;&quot;receipt_type&#92;&quot;:&#92;&quot;printed&#92;&quot;,&#92;&quot;order_total&#92;&quot;:111.01},{&#92;&quot;Index0&#92;&quot;:4,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00040&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;channel&#92;&quot;:&#92;&quot;in_store&#92;&quot;,&#92;&quot;order_datetime&#92;&quot;:&#92;&quot;2025-07-12 11:25:32&#92;&quot;,&#92;&quot;order_date&#92;&quot;:&#92;&quot;2025-07-12&#92;&quot;,&#92;&quot;day_of_week&#92;&quot;:&#92;&quot;Saturday&#92;&quot;,&#92;&quot;hour_of_day&#92;&quot;:11,&#92;&quot;subtotal&#92;&quot;:6.95,&#92;&quot;discount_amount&#92;&quot;:0.0,&#92;&quot;item_count&#92;&quot;:1,&#92;&quot;payment_method&#92;&quot;:&#92;&quot;cash&#92;&quot;,&#92;&quot;payment_status&#92;&quot;:&#92;&quot;authorized&#92;&quot;,&#92;&quot;session_id&#92;&quot;:NaN,&#92;&quot;shipping_state&#92;&quot;:NaN,&#92;&quot;shipping_zip&#92;&quot;:NaN,&#92;&quot;shipping_fee&#92;&quot;:NaN,&#92;&quot;fulfillment_type&#92;&quot;:NaN,&#92;&quot;promo_code&#92;&quot;:NaN,&#92;&quot;device&#92;&quot;:NaN,&#92;&quot;register_id&#92;&quot;:&#92;&quot;REG01&#92;&quot;,&#92;&quot;employee_id&#92;&quot;:&#92;&quot;EMP01&#92;&quot;,&#92;&quot;entry_method&#92;&quot;:NaN,&#92;&quot;tip_amount&#92;&quot;:0.0,&#92;&quot;receipt_type&#92;&quot;:&#92;&quot;printed&#92;&quot;,&#92;&quot;order_total&#92;&quot;:6.95},{&#92;&quot;Index0&#92;&quot;:5,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00002&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0002&#92;&quot;,&#92;&quot;channel&#92;&quot;:&#92;&quot;in_store&#92;&quot;,&#92;&quot;order_datetime&#92;&quot;:&#92;&quot;2025-07-28 17:34:06&#92;&quot;,&#92;&quot;order_date&#92;&quot;:&#92;&quot;2025-07-28&#92;&quot;,&#92;&quot;day_of_week&#92;&quot;:&#92;&quot;Monday&#92;&quot;,&#92;&quot;hour_of_day&#92;&quot;:17,&#92;&quot;subtotal&#92;&quot;:81.9,&#92;&quot;discount_amount&#92;&quot;:0.0,&#92;&quot;item_count&#92;&quot;:3,&#92;&quot;payment_method&#92;&quot;:&#92;&quot;gift_card&#92;&quot;,&#92;&quot;payment_status&#92;&quot;:&#92;&quot;authorized&#92;&quot;,&#92;&quot;session_id&#92;&quot;:NaN,&#92;&quot;shipping_state&#92;&quot;:NaN,&#92;&quot;shipping_zip&#92;&quot;:NaN,&#92;&quot;shipping_fee&#92;&quot;:NaN,&#92;&quot;fulfillment_type&#92;&quot;:NaN,&#92;&quot;promo_code&#92;&quot;:NaN,&#92;&quot;device&#92;&quot;:NaN,&#92;&quot;register_id&#92;&quot;:&#92;&quot;REG02&#92;&quot;,&#92;&quot;employee_id&#92;&quot;:&#92;&quot;EMP03&#92;&quot;,&#92;&quot;entry_method&#92;&quot;:&#92;&quot;chip&#92;&quot;,&#92;&quot;tip_amount&#92;&quot;:0.0,&#92;&quot;receipt_type&#92;&quot;:&#92;&quot;sms&#92;&quot;,&#92;&quot;order_total&#92;&quot;:81.9},{&#92;&quot;Index0&#92;&quot;:6,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00035&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;channel&#92;&quot;:&#92;&quot;in_store&#92;&quot;,&#92;&quot;order_datetime&#92;&quot;:&#92;&quot;2025-07-29 13:08:46&#92;&quot;,&#92;&quot;order_date&#92;&quot;:&#92;&quot;2025-07-29&#92;&quot;,&#92;&quot;day_of_week&#92;&quot;:&#92;&quot;Tuesday&#92;&quot;,&#92;&quot;hour_of_day&#92;&quot;:13,&#92;&quot;subtotal&#92;&quot;:13.0,&#92;&quot;discount_amount&#92;&quot;:0.0,&#92;&quot;item_count&#92;&quot;:2,&#92;&quot;payment_method&#92;&quot;:&#92;&quot;card_present&#92;&quot;,&#92;&quot;payment_status&#92;&quot;:&#92;&quot;authorized&#92;&quot;,&#92;&quot;session_id&#92;&quot;:NaN,&#92;&quot;shipping_state&#92;&quot;:NaN,&#92;&quot;shipping_zip&#92;&quot;:NaN,&#92;&quot;shipping_fee&#92;&quot;:NaN,&#92;&quot;fulfillment_type&#92;&quot;:NaN,&#92;&quot;promo_code&#92;&quot;:NaN,&#92;&quot;device&#92;&quot;:NaN,&#92;&quot;register_id&#92;&quot;:&#92;&quot;REG01&#92;&quot;,&#92;&quot;employee_id&#92;&quot;:&#92;&quot;EMP02&#92;&quot;,&#92;&quot;entry_method&#92;&quot;:&#92;&quot;tap&#92;&quot;,&#92;&quot;tip_amount&#92;&quot;:0.0,&#92;&quot;receipt_type&#92;&quot;:&#92;&quot;none&#92;&quot;,&#92;&quot;order_total&#92;&quot;:13.0},{&#92;&quot;Index0&#92;&quot;:7,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00039&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;channel&#92;&quot;:&#92;&quot;in_store&#92;&quot;,&#92;&quot;order_datetime&#92;&quot;:&#92;&quot;2025-08-09 17:05:18&#92;&quot;,&#92;&quot;order_date&#92;&quot;:&#92;&quot;2025-08-09&#92;&quot;,&#92;&quot;day_of_week&#92;&quot;:&#92;&quot;Saturday&#92;&quot;,&#92;&quot;hour_of_day&#92;&quot;:17,&#92;&quot;subtotal&#92;&quot;:155.5,&#92;&quot;discount_amount&#92;&quot;:7.78,&#92;&quot;item_count&#92;&quot;:4,&#92;&quot;payment_method&#92;&quot;:&#92;&quot;apple_pay&#92;&quot;,&#92;&quot;payment_status&#92;&quot;:&#92;&quot;authorized&#92;&quot;,&#92;&quot;session_id&#92;&quot;:NaN,&#92;&quot;shipping_state&#92;&quot;:NaN,&#92;&quot;shipping_zip&#92;&quot;:NaN,&#92;&quot;shipping_fee&#92;&quot;:NaN,&#92;&quot;fulfillment_type&#92;&quot;:NaN,&#92;&quot;promo_code&#92;&quot;:NaN,&#92;&quot;device&#92;&quot;:NaN,&#92;&quot;register_id&#92;&quot;:&#92;&quot;REG01&#92;&quot;,&#92;&quot;employee_id&#92;&quot;:&#92;&quot;EMP01&#92;&quot;,&#92;&quot;entry_method&#92;&quot;:&#92;&quot;tap&#92;&quot;,&#92;&quot;tip_amount&#92;&quot;:0.0,&#92;&quot;receipt_type&#92;&quot;:&#92;&quot;printed&#92;&quot;,&#92;&quot;order_total&#92;&quot;:147.72},{&#92;&quot;Index0&#92;&quot;:27,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00011&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0010&#92;&quot;,&#92;&quot;channel&#92;&quot;:&#92;&quot;online&#92;&quot;,&#92;&quot;order_datetime&#92;&quot;:&#92;&quot;2026-06-08 14:13:59&#92;&quot;,&#92;&quot;order_date&#92;&quot;:&#92;&quot;2026-06-08&#92;&quot;,&#92;&quot;day_of_week&#92;&quot;:&#92;&quot;Monday&#92;&quot;,&#92;&quot;hour_of_day&#92;&quot;:14,&#92;&quot;subtotal&#92;&quot;:13.9,&#92;&quot;discount_amount&#92;&quot;:0.0,&#92;&quot;item_count&#92;&quot;:2,&#92;&quot;payment_method&#92;&quot;:&#92;&quot;card_not_present&#92;&quot;,&#92;&quot;payment_status&#92;&quot;:&#92;&quot;authorized&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000004&#92;&quot;,&#92;&quot;shipping_state&#92;&quot;:&#92;&quot;KY&#92;&quot;,&#92;&quot;shipping_zip&#92;&quot;:&#92;&quot;59930&#92;&quot;,&#92;&quot;shipping_fee&#92;&quot;:6.95,&#92;&quot;fulfillment_type&#92;&quot;:&#92;&quot;ship&#92;&quot;,&#92;&quot;promo_code&#92;&quot;:NaN,&#92;&quot;device&#92;&quot;:&#92;&quot;desktop&#92;&quot;,&#92;&quot;register_id&#92;&quot;:NaN,&#92;&quot;employee_id&#92;&quot;:NaN,&#92;&quot;entry_method&#92;&quot;:NaN,&#92;&quot;tip_amount&#92;&quot;:NaN,&#92;&quot;receipt_type&#92;&quot;:NaN,&#92;&quot;order_total&#92;&quot;:20.85},{&#92;&quot;Index0&#92;&quot;:29,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00014&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0013&#92;&quot;,&#92;&quot;channel&#92;&quot;:&#92;&quot;online&#92;&quot;,&#92;&quot;order_datetime&#92;&quot;:&#92;&quot;2026-07-25 17:53:18&#92;&quot;,&#92;&quot;order_date&#92;&quot;:&#92;&quot;2026-07-25&#92;&quot;,&#92;&quot;day_of_week&#92;&quot;:&#92;&quot;Saturday&#92;&quot;,&#92;&quot;hour_of_day&#92;&quot;:17,&#92;&quot;subtotal&#92;&quot;:13.9,&#92;&quot;discount_amount&#92;&quot;:0.7,&#92;&quot;item_count&#92;&quot;:2,&#92;&quot;payment_method&#92;&quot;:&#92;&quot;card_not_present&#92;&quot;,&#92;&quot;payment_status&#92;&quot;:&#92;&quot;authorized&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000005&#92;&quot;,&#92;&quot;shipping_state&#92;&quot;:&#92;&quot;OH&#92;&quot;,&#92;&quot;shipping_zip&#92;&quot;:&#92;&quot;29286&#92;&quot;,&#92;&quot;shipping_fee&#92;&quot;:6.95,&#92;&quot;fulfillment_type&#92;&quot;:&#92;&quot;ship&#92;&quot;,&#92;&quot;promo_code&#92;&quot;:&#92;&quot;MAILCHIMP15&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;mobile&#92;&quot;,&#92;&quot;register_id&#92;&quot;:NaN,&#92;&quot;employee_id&#92;&quot;:NaN,&#92;&quot;entry_method&#92;&quot;:NaN,&#92;&quot;tip_amount&#92;&quot;:NaN,&#92;&quot;receipt_type&#92;&quot;:NaN,&#92;&quot;order_total&#92;&quot;:20.15}]&quot;' data-total-rows='16' data-total-columns='25' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='true' data-page-size='10' data-field-types='[[&quot;transaction_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;customer_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;channel&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;order_datetime&quot;,[&quot;datetime&quot;,&quot;datetime64[us]&quot;]],[&quot;order_date&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;day_of_week&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;hour_of_day&quot;,[&quot;integer&quot;,&quot;int64&quot;]],[&quot;subtotal&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;discount_amount&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;item_count&quot;,[&quot;integer&quot;,&quot;int64&quot;]],[&quot;payment_method&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;payment_status&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;session_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;shipping_state&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;shipping_zip&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;shipping_fee&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;fulfillment_type&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;promo_code&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;device&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;register_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;employee_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;entry_method&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;tip_amount&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;receipt_type&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;order_total&quot;,[&quot;number&quot;,&quot;float64&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='true' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[[&quot;Index0&quot;,[&quot;integer&quot;,&quot;int64&quot;]]]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "orders=42  order_items=93\nchannel\nin_store    34\nonline       8\nanonymous in-store=23  guest online=1\nonline orders run 2026-06-08 -> 2026-08-16\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
       "id": "ZHCJ",
-      "code_hash": "1563fca7147476bb94e1ce931d7c6ebc",
-      "outputs": [],
+      "code_hash": "03f87f6427f33f0a0f181a9c1637f6ba",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='ZHCJ-0' random-id='267d5636-a4a7-a6b0-7f8c-41819629c8dd'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;order_item_id&#92;&quot;:&#92;&quot;OI000001&#92;&quot;,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00001&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0017&#92;&quot;,&#92;&quot;quantity&#92;&quot;:1,&#92;&quot;unit_price&#92;&quot;:13.5,&#92;&quot;line_total&#92;&quot;:13.5},{&#92;&quot;order_item_id&#92;&quot;:&#92;&quot;OI000002&#92;&quot;,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00001&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0004&#92;&quot;,&#92;&quot;quantity&#92;&quot;:1,&#92;&quot;unit_price&#92;&quot;:21.0,&#92;&quot;line_total&#92;&quot;:21.0},{&#92;&quot;order_item_id&#92;&quot;:&#92;&quot;OI000003&#92;&quot;,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00002&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0014&#92;&quot;,&#92;&quot;quantity&#92;&quot;:1,&#92;&quot;unit_price&#92;&quot;:38.0,&#92;&quot;line_total&#92;&quot;:38.0},{&#92;&quot;order_item_id&#92;&quot;:&#92;&quot;OI000004&#92;&quot;,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00002&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0002&#92;&quot;,&#92;&quot;quantity&#92;&quot;:2,&#92;&quot;unit_price&#92;&quot;:21.95,&#92;&quot;line_total&#92;&quot;:43.9},{&#92;&quot;order_item_id&#92;&quot;:&#92;&quot;OI000005&#92;&quot;,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00003&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0003&#92;&quot;,&#92;&quot;quantity&#92;&quot;:2,&#92;&quot;unit_price&#92;&quot;:38.95,&#92;&quot;line_total&#92;&quot;:77.9},{&#92;&quot;order_item_id&#92;&quot;:&#92;&quot;OI000006&#92;&quot;,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00003&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0017&#92;&quot;,&#92;&quot;quantity&#92;&quot;:2,&#92;&quot;unit_price&#92;&quot;:13.5,&#92;&quot;line_total&#92;&quot;:27.0},{&#92;&quot;order_item_id&#92;&quot;:&#92;&quot;OI000007&#92;&quot;,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00003&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0007&#92;&quot;,&#92;&quot;quantity&#92;&quot;:1,&#92;&quot;unit_price&#92;&quot;:34.0,&#92;&quot;line_total&#92;&quot;:34.0},{&#92;&quot;order_item_id&#92;&quot;:&#92;&quot;OI000008&#92;&quot;,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00004&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0025&#92;&quot;,&#92;&quot;quantity&#92;&quot;:2,&#92;&quot;unit_price&#92;&quot;:50.0,&#92;&quot;line_total&#92;&quot;:100.0},{&#92;&quot;order_item_id&#92;&quot;:&#92;&quot;OI000009&#92;&quot;,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00004&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0001&#92;&quot;,&#92;&quot;quantity&#92;&quot;:2,&#92;&quot;unit_price&#92;&quot;:6.95,&#92;&quot;line_total&#92;&quot;:13.9},{&#92;&quot;order_item_id&#92;&quot;:&#92;&quot;OI000010&#92;&quot;,&#92;&quot;transaction_id&#92;&quot;:&#92;&quot;TXN00005&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0023&#92;&quot;,&#92;&quot;quantity&#92;&quot;:1,&#92;&quot;unit_price&#92;&quot;:31.95,&#92;&quot;line_total&#92;&quot;:31.95}]&quot;' data-total-rows='15' data-total-columns='6' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='true' data-page-size='10' data-field-types='[[&quot;order_item_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;transaction_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;product_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;quantity&quot;,[&quot;integer&quot;,&quot;int64&quot;]],[&quot;unit_price&quot;,[&quot;number&quot;,&quot;float64&quot;]],[&quot;line_total&quot;,[&quot;number&quot;,&quot;float64&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='true' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
       "console": []
     },
     {
       "id": "ROlb",
+      "code_hash": "9bca5d8a8f91831d6970247c7d813a04",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"table-5-sessions-pk-session_id\">Table 5 \u2014 <code>sessions</code>  [PK: session_id]</h2>\n<span class=\"paragraph\">Website visits only \u2014 a POS has no equivalent, which is exactly why the funnel KPIs need this\ntable. The converting sessions already exist (one per <strong>online</strong> order). Here we add\n<strong>abandoned-cart</strong> and <strong>browse-only</strong> sessions so the online funnel hits conversion ~2% and\nabandonment ~68%:</span>\n<ul>\n<li><code>total_carts = online_orders / (1 \u2212 0.68)</code> \u2192 abandoned = carts \u2212 online orders</li>\n<li><code>total_sessions = online_orders / 0.02</code> \u2192 browse-only = sessions \u2212 carts</li>\n</ul>\n<span class=\"paragraph\">All sessions fall on or after <code>LAUNCH_DATE</code>, and some are anonymous (<code>customer_id = None</code>).\nIn-store orders are deliberately excluded from both sides of the conversion ratio.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "9d4f48bd7daafb134554012df23788b9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='qnkX-0' random-id='1c460da3-1843-cfa6-71e2-766bc4122514'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000340&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;session_start&#92;&quot;:&#92;&quot;2026-05-31 09:10:45&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;desktop&#92;&quot;,&#92;&quot;traffic_source&#92;&quot;:&#92;&quot;social&#92;&quot;,&#92;&quot;landing_page&#92;&quot;:&#92;&quot;/product&#92;&quot;,&#92;&quot;reached_cart&#92;&quot;:false,&#92;&quot;converted&#92;&quot;:false},{&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000310&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0010&#92;&quot;,&#92;&quot;session_start&#92;&quot;:&#92;&quot;2026-05-31 16:30:14&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;mobile&#92;&quot;,&#92;&quot;traffic_source&#92;&quot;:&#92;&quot;organic&#92;&quot;,&#92;&quot;landing_page&#92;&quot;:&#92;&quot;/&#92;&quot;,&#92;&quot;reached_cart&#92;&quot;:false,&#92;&quot;converted&#92;&quot;:false},{&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000093&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0014&#92;&quot;,&#92;&quot;session_start&#92;&quot;:&#92;&quot;2026-05-31 23:07:25&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;desktop&#92;&quot;,&#92;&quot;traffic_source&#92;&quot;:&#92;&quot;referral&#92;&quot;,&#92;&quot;landing_page&#92;&quot;:&#92;&quot;/sale&#92;&quot;,&#92;&quot;reached_cart&#92;&quot;:false,&#92;&quot;converted&#92;&quot;:false},{&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000313&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0009&#92;&quot;,&#92;&quot;session_start&#92;&quot;:&#92;&quot;2026-06-01 00:23:49&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;desktop&#92;&quot;,&#92;&quot;traffic_source&#92;&quot;:&#92;&quot;organic&#92;&quot;,&#92;&quot;landing_page&#92;&quot;:&#92;&quot;/sale&#92;&quot;,&#92;&quot;reached_cart&#92;&quot;:false,&#92;&quot;converted&#92;&quot;:false},{&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000265&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0014&#92;&quot;,&#92;&quot;session_start&#92;&quot;:&#92;&quot;2026-06-01 09:41:50&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;mobile&#92;&quot;,&#92;&quot;traffic_source&#92;&quot;:&#92;&quot;mailchimp&#92;&quot;,&#92;&quot;landing_page&#92;&quot;:&#92;&quot;/sale&#92;&quot;,&#92;&quot;reached_cart&#92;&quot;:false,&#92;&quot;converted&#92;&quot;:false},{&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000239&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;session_start&#92;&quot;:&#92;&quot;2026-06-01 11:56:45&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;mobile&#92;&quot;,&#92;&quot;traffic_source&#92;&quot;:&#92;&quot;organic&#92;&quot;,&#92;&quot;landing_page&#92;&quot;:&#92;&quot;/new-arrivals&#92;&quot;,&#92;&quot;reached_cart&#92;&quot;:false,&#92;&quot;converted&#92;&quot;:false},{&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000280&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0003&#92;&quot;,&#92;&quot;session_start&#92;&quot;:&#92;&quot;2026-06-01 15:56:39&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;mobile&#92;&quot;,&#92;&quot;traffic_source&#92;&quot;:&#92;&quot;social&#92;&quot;,&#92;&quot;landing_page&#92;&quot;:&#92;&quot;/product&#92;&quot;,&#92;&quot;reached_cart&#92;&quot;:false,&#92;&quot;converted&#92;&quot;:false},{&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000160&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0005&#92;&quot;,&#92;&quot;session_start&#92;&quot;:&#92;&quot;2026-06-01 21:28:58&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;mobile&#92;&quot;,&#92;&quot;traffic_source&#92;&quot;:&#92;&quot;social&#92;&quot;,&#92;&quot;landing_page&#92;&quot;:&#92;&quot;/collections/best-sellers&#92;&quot;,&#92;&quot;reached_cart&#92;&quot;:false,&#92;&quot;converted&#92;&quot;:false},{&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000105&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;session_start&#92;&quot;:&#92;&quot;2026-06-02 10:18:56&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;desktop&#92;&quot;,&#92;&quot;traffic_source&#92;&quot;:&#92;&quot;mailchimp&#92;&quot;,&#92;&quot;landing_page&#92;&quot;:&#92;&quot;/&#92;&quot;,&#92;&quot;reached_cart&#92;&quot;:false,&#92;&quot;converted&#92;&quot;:false},{&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000304&#92;&quot;,&#92;&quot;customer_id&#92;&quot;:NaN,&#92;&quot;session_start&#92;&quot;:&#92;&quot;2026-06-02 11:05:20&#92;&quot;,&#92;&quot;device&#92;&quot;:&#92;&quot;desktop&#92;&quot;,&#92;&quot;traffic_source&#92;&quot;:&#92;&quot;organic&#92;&quot;,&#92;&quot;landing_page&#92;&quot;:&#92;&quot;/new-arrivals&#92;&quot;,&#92;&quot;reached_cart&#92;&quot;:false,&#92;&quot;converted&#92;&quot;:false}]&quot;' data-total-rows='15' data-total-columns='8' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='true' data-page-size='10' data-field-types='[[&quot;session_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;customer_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;session_start&quot;,[&quot;datetime&quot;,&quot;datetime64[us]&quot;]],[&quot;device&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;traffic_source&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;landing_page&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;reached_cart&quot;,[&quot;boolean&quot;,&quot;bool&quot;]],[&quot;converted&quot;,[&quot;boolean&quot;,&quot;bool&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='true' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "sessions=400  carts=25  abandoned=17  browse=375\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "d73eca5e75ecd5d0d27271b04b69ac28",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"back-fill-first_order_date\">Back-fill <code>first_order_date</code></h3>\n<span class=\"paragraph\">Now that orders exist, set each customer's first order date from their earliest <strong>attributable</strong>\norder, across both channels. This is the single source of truth for first-purchase / cohort\nanalysis \u2014 there is no <code>is_first_order</code> flag on <code>orders</code>, since it is derivable from here and\nwould be misleading anyway while most in-store sales are anonymous.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Vxnm",
+      "code_hash": "ee1a0f198f2feadd575d795fa2956cd0",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='Vxnm-0' random-id='4eab11cb-fa91-315c-91ee-4fdea13ff782'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0001&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;johnsonjoshua@example.org&#92;&quot;,&#92;&quot;age&#92;&quot;:29,&#92;&quot;age_band&#92;&quot;:&#92;&quot;25-34&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;female&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;DC&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;97031&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2025-07-05&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;organic&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;2026-08-11&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0002&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;rhodespatricia@example.org&#92;&quot;,&#92;&quot;age&#92;&quot;:49,&#92;&quot;age_band&#92;&quot;:&#92;&quot;45+&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;female&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;OR&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;55803&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2025-05-30&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;mailchimp&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;2025-07-28&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0003&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;johnsonjeffery@example.net&#92;&quot;,&#92;&quot;age&#92;&quot;:30,&#92;&quot;age_band&#92;&quot;:&#92;&quot;25-34&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;female&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;PA&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;03979&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2026-05-20&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;organic&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;2026-07-02&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0004&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;jennifermiles@example.com&#92;&quot;,&#92;&quot;age&#92;&quot;:23,&#92;&quot;age_band&#92;&quot;:&#92;&quot;18-24&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;nonbinary&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;IN&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;59379&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2025-04-11&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;mailchimp&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;2025-12-14&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0005&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;lisa02@example.net&#92;&quot;,&#92;&quot;age&#92;&quot;:19,&#92;&quot;age_band&#92;&quot;:&#92;&quot;18-24&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;nonbinary&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;NE&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;45098&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2025-04-28&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;referral&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;2025-12-18&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0006&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;eric51@example.org&#92;&quot;,&#92;&quot;age&#92;&quot;:40,&#92;&quot;age_band&#92;&quot;:&#92;&quot;35-44&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;female&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;MS&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;13177&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2026-06-09&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;referral&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;2026-08-16&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0007&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;melanie94@example.org&#92;&quot;,&#92;&quot;age&#92;&quot;:48,&#92;&quot;age_band&#92;&quot;:&#92;&quot;45+&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;nonbinary&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;VA&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;60718&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2026-07-29&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;social&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;2026-08-28&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0008&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;dudleynicholas@example.net&#92;&quot;,&#92;&quot;age&#92;&quot;:36,&#92;&quot;age_band&#92;&quot;:&#92;&quot;35-44&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;female&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;LA&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;82898&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2026-02-07&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;mailchimp&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;2026-05-22&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:2},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0009&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;barbara10@example.net&#92;&quot;,&#92;&quot;age&#92;&quot;:19,&#92;&quot;age_band&#92;&quot;:&#92;&quot;18-24&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;nonbinary&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;IN&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;38431&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2026-03-16&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;referral&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;2026-07-29&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1},{&#92;&quot;customer_id&#92;&quot;:&#92;&quot;CUST0010&#92;&quot;,&#92;&quot;email&#92;&quot;:&#92;&quot;wyattmichelle@example.com&#92;&quot;,&#92;&quot;age&#92;&quot;:28,&#92;&quot;age_band&#92;&quot;:&#92;&quot;25-34&#92;&quot;,&#92;&quot;gender&#92;&quot;:&#92;&quot;male&#92;&quot;,&#92;&quot;state&#92;&quot;:&#92;&quot;KY&#92;&quot;,&#92;&quot;zip&#92;&quot;:&#92;&quot;59930&#92;&quot;,&#92;&quot;signup_date&#92;&quot;:&#92;&quot;2025-11-07&#92;&quot;,&#92;&quot;acquisition_source&#92;&quot;:&#92;&quot;social&#92;&quot;,&#92;&quot;first_order_date&#92;&quot;:&#92;&quot;2026-06-08&#92;&quot;,&#92;&quot;total_orders&#92;&quot;:1}]&quot;' data-total-rows='15' data-total-columns='11' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='true' data-page-size='10' data-field-types='[[&quot;customer_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;email&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;age&quot;,[&quot;integer&quot;,&quot;int64&quot;]],[&quot;age_band&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;gender&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;state&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;zip&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;signup_date&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;acquisition_source&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;first_order_date&quot;,[&quot;string&quot;,&quot;object&quot;]],[&quot;total_orders&quot;,[&quot;integer&quot;,&quot;int64&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='true' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "DnEU",
       "code_hash": "5b999adfdd02d1226a104e7dfe11cd4d",
       "outputs": [
         {
@@ -164,32 +328,60 @@
       "console": []
     },
     {
-      "id": "qnkX",
-      "code_hash": "01e91c3a248f91042022fa0d87994ebe",
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "TqIu",
-      "code_hash": "00ae6287df1bce032210b80068820427",
+      "id": "ulZA",
+      "code_hash": "b2385ad9e0364c06b695851b0de43537",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"overview-kpi-check-integrity\">Overview, KPI check &amp; integrity</h2>\n<span class=\"paragraph\">Confirm the six DataFrames, verify the KPI targets, and assert the numeric relationships hold.</span></span>"
+            "text/html": "<marimo-ui-element object-id='ulZA-0' random-id='e75c5c61-3e2a-a830-6b34-85e28c18dea2'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;event_id&#92;&quot;:&#92;&quot;EVT0000001&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000340&#92;&quot;,&#92;&quot;event_type&#92;&quot;:&#92;&quot;page_view&#92;&quot;,&#92;&quot;product_id&#92;&quot;:NaN,&#92;&quot;event_time&#92;&quot;:&#92;&quot;2026-05-31 09:10:45&#92;&quot;},{&#92;&quot;event_id&#92;&quot;:&#92;&quot;EVT0000002&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000340&#92;&quot;,&#92;&quot;event_type&#92;&quot;:&#92;&quot;product_view&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0018&#92;&quot;,&#92;&quot;event_time&#92;&quot;:&#92;&quot;2026-05-31 09:12:48&#92;&quot;},{&#92;&quot;event_id&#92;&quot;:&#92;&quot;EVT0000003&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000340&#92;&quot;,&#92;&quot;event_type&#92;&quot;:&#92;&quot;product_view&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0011&#92;&quot;,&#92;&quot;event_time&#92;&quot;:&#92;&quot;2026-05-31 09:13:47&#92;&quot;},{&#92;&quot;event_id&#92;&quot;:&#92;&quot;EVT0000004&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000340&#92;&quot;,&#92;&quot;event_type&#92;&quot;:&#92;&quot;product_view&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0029&#92;&quot;,&#92;&quot;event_time&#92;&quot;:&#92;&quot;2026-05-31 09:15:35&#92;&quot;},{&#92;&quot;event_id&#92;&quot;:&#92;&quot;EVT0000005&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000310&#92;&quot;,&#92;&quot;event_type&#92;&quot;:&#92;&quot;page_view&#92;&quot;,&#92;&quot;product_id&#92;&quot;:NaN,&#92;&quot;event_time&#92;&quot;:&#92;&quot;2026-05-31 16:30:14&#92;&quot;},{&#92;&quot;event_id&#92;&quot;:&#92;&quot;EVT0000006&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000310&#92;&quot;,&#92;&quot;event_type&#92;&quot;:&#92;&quot;product_view&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0022&#92;&quot;,&#92;&quot;event_time&#92;&quot;:&#92;&quot;2026-05-31 16:31:34&#92;&quot;},{&#92;&quot;event_id&#92;&quot;:&#92;&quot;EVT0000007&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000310&#92;&quot;,&#92;&quot;event_type&#92;&quot;:&#92;&quot;product_view&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0016&#92;&quot;,&#92;&quot;event_time&#92;&quot;:&#92;&quot;2026-05-31 16:33:55&#92;&quot;},{&#92;&quot;event_id&#92;&quot;:&#92;&quot;EVT0000008&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000310&#92;&quot;,&#92;&quot;event_type&#92;&quot;:&#92;&quot;product_view&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0010&#92;&quot;,&#92;&quot;event_time&#92;&quot;:&#92;&quot;2026-05-31 16:35:09&#92;&quot;},{&#92;&quot;event_id&#92;&quot;:&#92;&quot;EVT0000009&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000093&#92;&quot;,&#92;&quot;event_type&#92;&quot;:&#92;&quot;page_view&#92;&quot;,&#92;&quot;product_id&#92;&quot;:NaN,&#92;&quot;event_time&#92;&quot;:&#92;&quot;2026-05-31 23:07:25&#92;&quot;},{&#92;&quot;event_id&#92;&quot;:&#92;&quot;EVT0000010&#92;&quot;,&#92;&quot;session_id&#92;&quot;:&#92;&quot;SESS000093&#92;&quot;,&#92;&quot;event_type&#92;&quot;:&#92;&quot;product_view&#92;&quot;,&#92;&quot;product_id&#92;&quot;:&#92;&quot;PROD0004&#92;&quot;,&#92;&quot;event_time&#92;&quot;:&#92;&quot;2026-05-31 23:09:26&#92;&quot;}]&quot;' data-total-rows='15' data-total-columns='5' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='true' data-page-size='10' data-field-types='[[&quot;event_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;session_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;event_type&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;product_id&quot;,[&quot;string&quot;,&quot;str&quot;]],[&quot;event_time&quot;,[&quot;datetime&quot;,&quot;datetime64[us]&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='true' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "events=1252\n",
+          "mimetype": "text/plain"
+        }
+      ]
+    },
+    {
+      "id": "ecfG",
+      "code_hash": "a320f912be4de6fe53cdc5912d24eb34",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"overview-kpi-check-integrity\">Overview, KPI check &amp; integrity</h2>\n<span class=\"paragraph\">Confirm the six DataFrames, verify the KPI targets, and assert the numeric, channel, and\ntiming rules hold \u2014 including that no in-store order lands outside store hours and no online\norder predates launch.</span></span>"
           }
         }
       ],
       "console": []
     },
     {
-      "id": "Vxnm",
-      "code_hash": "d9468f646f4b6fb7e3d5a34e8503f265",
-      "outputs": [],
-      "console": []
+      "id": "Pvdt",
+      "code_hash": "6329b357b3b0be4db233d68c7f5114f4",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "Table shapes\n  customers    rows=   15  cols=11\n  orders       rows=   42  cols=25\n  order_items  rows=   93  cols=6\n  products     rows=   30  cols=7\n  sessions     rows=  400  cols=8\n  events       rows= 1252  cols=5\n\nKPIs (actual vs target)\n  Conversion rate :  2.00%  (target ~2%, online orders / sessions)\n  Cart abandonment: 68.00%  (target ~68%)\n  Repeat purchase : 20.00%  (target ~20%)\n\nChannel profile\n  In-store :   34 orders  AOV $ 104.78  anonymous 68%\n  Online   :    8 orders  AOV $  60.79  guest 12%\n\nTop 8 sellers by units\n                                           units  revenue\nproduct_name              category                       \nLetterpress Greeting Card Stationery          32   222.40\nGold Vermeil Hoops        Accessories         13   636.35\nWeekly Desk Planner       Stationery          12   252.00\nStoneware Mug             Kitchen & Table     12   252.00\nOatmeal Soap Bar          Bath & Body         12   120.00\nMineral Bath Salts        Bath & Body         10   319.50\nRosemary Spiced Nuts      Pantry & Treats      9    90.00\nWildflower Honey          Pantry & Treats      8   144.00\n\n  Top 20% of SKUs = 44% of revenue (Pareto check)\n  SKUs with zero sales: 5\n\nCategory mix by revenue\ncategory\nKitchen & Table    0.235\nStationery         0.201\nAccessories        0.195\nBath & Body        0.193\nPantry & Treats    0.097\nHome               0.079\n\nIntegrity checks passed: money, FKs, channel exclusivity, store hours, and launch date all consistent.\n",
+          "mimetype": "text/plain"
+        }
+      ]
     },
     {
-      "id": "DnEU",
+      "id": "ZBYS",
       "code_hash": "070732f10e6f3efa1746749e81cf7e25",
       "outputs": [
         {
@@ -202,7 +394,7 @@
       "console": []
     },
     {
-      "id": "ulZA",
+      "id": "aLJB",
       "code_hash": "f08e16587c26644030e7d7f64cf626d6",
       "outputs": [],
       "console": []
