@@ -118,6 +118,16 @@ def _(pd):
     INSTORE_ANON_RATE = 0.68      # in-store orders with no customer_id (no receipt captured)
     ONLINE_GUEST_RATE = 0.12      # online orders checked out as a guest
     BIRTHDATE_CAPTURE_RATE = 0.45  # share of customers who actually hand over a birthday
+    GIFT_SHIP_RATE = 0.20          # online orders shipped somewhere other than the buyer's address
+
+    # ---- Geography: a boutique's customers cluster near the store (Richmond, VA) ----
+    # zip prefixes keep state and zip internally consistent, which Faker alone won't do
+    STATE_ZIP_PREFIX = {
+        "VA": "232", "MD": "208", "DC": "200", "NC": "275",
+        "PA": "191", "NY": "100", "CA": "941", "TX": "787",
+    }
+    STATE_W = [0.44, 0.12, 0.10, 0.08, 0.06, 0.06, 0.07, 0.07]
+    APT_RATE = 0.25  # share of addresses with a unit/suite line
 
     # ---- Store hours: open daily 10:00-18:00 ----
     STORE_OPEN_HOUR, STORE_CLOSE_HOUR = 10, 18
@@ -165,6 +175,7 @@ def _(pd):
     print(f"History {HISTORY_START.date()} -> {TODAY.date()}  |  site launched {LAUNCH_DATE.date()}")
     return (
         ACQ_SOURCES,
+        APT_RATE,
         BASKET_SIZE,
         BIRTHDATE_CAPTURE_RATE,
         DECLINE_RATE,
@@ -175,6 +186,7 @@ def _(pd):
         ENTRY_METHOD_W,
         FREE_SHIP_THRESHOLD,
         GENDERS,
+        GIFT_SHIP_RATE,
         HISTORY_START,
         INSTORE_ANON_RATE,
         INSTORE_DOW_W,
@@ -193,6 +205,8 @@ def _(pd):
         P_ONLINE_ATTRIBUTABLE,
         REGISTERS,
         SHIPPING_FEE,
+        STATE_W,
+        STATE_ZIP_PREFIX,
         STORE_CLOSE_HOUR,
         STORE_OPEN_HOUR,
         TARGET_ABANDONMENT,
@@ -257,6 +271,50 @@ def _(
     _demo = pd.Series([sample_datetime("in_store", HISTORY_START, TODAY).hour for _ in range(500)])
     print("In-store hour range:", _demo.min(), "-", _demo.max(), "(store open 10-18)")
     return (sample_datetime,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Address sampling
+
+    Addresses are generated as separate components (`line1` / `line2` / `city` / `state` / `zip`)
+    rather than one blob, so location analysis can group by state or zip without parsing.
+
+    Two realism details: customers cluster near the store rather than being spread uniformly over
+    all 50 states and territories, and the **zip prefix is derived from the state** — Faker's
+    `state_abbr()` and `zipcode()` are independent, so used naively they happily produce a Virginia
+    address with a Montana zip.
+    """)
+    return
+
+
+@app.cell
+def _(APT_RATE, STATE_W, STATE_ZIP_PREFIX, fake, np, random):
+    def sample_address(prefix=""):
+        """A US address as separate components. `prefix` namespaces the keys, e.g. 'shipping_'."""
+        state = str(np.random.choice(list(STATE_ZIP_PREFIX), p=STATE_W))
+        zip_code = f"{STATE_ZIP_PREFIX[state]}{np.random.randint(0, 100):02d}"
+        return {
+            # building_number + street_name, not street_address() — the latter embeds a unit
+            # number, which would collide with address_line2
+            f"{prefix}address_line1": f"{fake.building_number()} {fake.street_name()}",
+            f"{prefix}address_line2": fake.secondary_address() if random.random() < APT_RATE else None,
+            f"{prefix}city": fake.city(),
+            f"{prefix}state": state,
+            f"{prefix}zip": zip_code,
+        }
+
+
+    def copy_address(row, prefix="shipping_"):
+        """Re-key a customer's address onto an order as the shipping address."""
+        return {f"{prefix}{f}": row[f"{f}"] for f in
+                ("address_line1", "address_line2", "city", "state", "zip")}
+
+
+    for _ in range(3):
+        print(sample_address())
+    return copy_address, sample_address
 
 
 @app.cell(hide_code=True)
@@ -404,6 +462,7 @@ def _(
     pd,
     random,
     repeat_customers,
+    sample_address,
 ):
     def age_band(a):
         if a is None:
@@ -427,13 +486,14 @@ def _(
         else:
             birthdate, age = (None, None)  # birthday is opt-in at signup, so most customers have no age on file
         _signup = HISTORY_START + pd.Timedelta(days=int(np.random.randint(0, signup_window)))
-        customers.append({'customer_id': f'CUST{_i:04d}', 'email': fake.unique.email(), 'birthdate': birthdate, 'age': age, 'age_band': age_band(age), 'gender': random.choice(GENDERS), 'state': fake.state_abbr(), 'zip': fake.zipcode(), 'signup_date': _signup.date(), 'acquisition_source': random.choice(ACQ_SOURCES), 'first_order_date': pd.NaT, 'total_orders': order_counts[_i - 1]})
+        customers.append({'customer_id': f'CUST{_i:04d}', 'email': fake.unique.email(), 'birthdate': birthdate, 'age': age, 'age_band': age_band(age), 'gender': random.choice(GENDERS), **sample_address(), 'signup_date': _signup.date(), 'acquisition_source': random.choice(ACQ_SOURCES), 'first_order_date': pd.NaT, 'total_orders': order_counts[_i - 1]})
     customers_df = pd.DataFrame(customers)
     customers_df['birthdate'] = pd.to_datetime(customers_df['birthdate'])
     customers_df['age'] = customers_df['age'].astype('Int64')
     have_bday = customers_df['birthdate'].notna().sum()
     print(f'{have_bday}/{len(customers_df)} customers have a birthday on file ({have_bday / len(customers_df):.0%}) — age/age_band are null for the rest')
-    customers_df  # filled after orders are built
+    print(f"Top states: {customers_df['state'].value_counts().head(4).to_dict()}")
+    customers_df  # default / billing address  # filled after orders are built
     return (customers_df,)
 
 
@@ -469,6 +529,7 @@ def _(
     ENTRY_METHODS,
     ENTRY_METHOD_W,
     FREE_SHIP_THRESHOLD,
+    GIFT_SHIP_RATE,
     HISTORY_START,
     INSTORE_ANON_RATE,
     LANDING_PAGES,
@@ -480,20 +541,22 @@ def _(
     REGISTERS,
     SHIPPING_FEE,
     TODAY,
+    copy_address,
     count,
     customers_df,
-    fake,
     np,
     pd,
     product_weights,
     products_df,
     random,
+    sample_address,
     sample_datetime,
 ):
     order_rows, oi_rows, sess_rows = ([], [], [])
     order_counter, session_counter = (count(1), count(1))
     product_ids = products_df['product_id'].tolist()
     price_lookup = products_df.set_index('product_id')['price'].to_dict()
+    SHIP_FIELDS = ['shipping_address_line1', 'shipping_address_line2', 'shipping_city', 'shipping_state', 'shipping_zip']
 
     def build_order(customer, channel, when):
         """One order plus its line items. `customer` is None for a walk-in or guest checkout."""
@@ -514,13 +577,15 @@ def _(
         method = str(np.random.choice(methods, p=method_p))
         declined = method != 'cash' and random.random() < DECLINE_RATE[channel]
         discount = round(subtotal * np.random.choice([0, 0.05, 0.1], p=[0.7, 0.2, 0.1]), 2)
-        row = {'transaction_id': tid, 'customer_id': customer['customer_id'] if customer is not None else None, 'channel': channel, 'order_datetime': when, 'order_date': when.date(), 'day_of_week': when.day_name(), 'hour_of_day': when.hour, 'subtotal': subtotal, 'discount_amount': discount, 'item_count': total_qty, 'payment_method': method, 'payment_status': 'declined' if declined else 'authorized', 'session_id': None, 'shipping_state': None, 'shipping_zip': None, 'shipping_fee': None, 'fulfillment_type': None, 'promo_code': None, 'device': None, 'register_id': None, 'employee_id': None, 'entry_method': None, 'tip_amount': None, 'receipt_type': None}
+        row = {'transaction_id': tid, 'customer_id': customer['customer_id'] if customer is not None else None, 'channel': channel, 'order_datetime': when, 'order_date': when.date(), 'day_of_week': when.day_name(), 'hour_of_day': when.hour, 'subtotal': subtotal, 'discount_amount': discount, 'item_count': total_qty, 'payment_method': method, 'payment_status': 'declined' if declined else 'authorized', 'session_id': None, **{f: None for f in SHIP_FIELDS}, 'is_gift_ship': None, 'shipping_fee': None, 'fulfillment_type': None, 'promo_code': None, 'device': None, 'register_id': None, 'employee_id': None, 'entry_method': None, 'tip_amount': None, 'receipt_type': None}
         if channel == 'online':
             sid = f'SESS{next(session_counter):06d}'
             fulfillment = str(np.random.choice(['ship', 'pickup_in_store'], p=[0.85, 0.15]))
             free_ship = fulfillment == 'pickup_in_store' or subtotal >= FREE_SHIP_THRESHOLD
             device = str(np.random.choice(DEVICES, p=DEVICE_W))
-            row.update({'session_id': sid, 'shipping_state': customer['state'] if customer is not None else fake.state_abbr(), 'shipping_zip': customer['zip'] if customer is not None else fake.zipcode(), 'shipping_fee': 0.0 if free_ship else SHIPPING_FEE, 'fulfillment_type': fulfillment, 'promo_code': random.choice(PROMO_CODES) if discount > 0 else None, 'device': device})
+            gift = customer is None or random.random() < GIFT_SHIP_RATE
+            ship_to = sample_address('shipping_') if gift else copy_address(customer)
+            row.update({'session_id': sid, **ship_to, 'is_gift_ship': gift, 'shipping_fee': 0.0 if free_ship else SHIPPING_FEE, 'fulfillment_type': fulfillment, 'promo_code': random.choice(PROMO_CODES) if discount > 0 else None, 'device': device})
             sess_rows.append({'session_id': sid, 'customer_id': row['customer_id'], 'session_start': when - pd.Timedelta(minutes=int(np.random.randint(3, 30))), 'device': device, 'traffic_source': customer['acquisition_source'] if customer is not None else random.choice(ACQ_SOURCES), 'landing_page': random.choice(LANDING_PAGES), 'reached_cart': True, 'converted': True})
         else:
             row.update({'register_id': random.choice(REGISTERS), 'employee_id': random.choice(EMPLOYEES), 'entry_method': None if method == 'cash' else str(np.random.choice(ENTRY_METHODS, p=ENTRY_METHOD_W)), 'tip_amount': 0.0 if random.random() < 0.9 else round(subtotal * 0.05, 2), 'receipt_type': random.choice(['email', 'sms']) if customer is not None else random.choice(['printed', 'none'])})
@@ -542,16 +607,20 @@ def _(
     for _ in range(n_guest_online):
         order_rows.append(build_order(None, 'online', sample_datetime('online', LAUNCH_DATE, TODAY)))  # online-only
     orders_df = pd.DataFrame(order_rows).sort_values('order_datetime').reset_index(drop=True)
+    orders_df['is_gift_ship'] = orders_df['is_gift_ship'].astype('boolean')
     order_items_df = pd.DataFrame(oi_rows)
+    online_mask = orders_df['channel'] == 'online'
     print(f'orders={len(orders_df)}  order_items={len(order_items_df)}')
     print(orders_df['channel'].value_counts().to_string())
     print(f'anonymous in-store={n_anon_instore}  guest online={n_guest_online}')
-    print(f"online orders run {orders_df.loc[orders_df['channel'] == 'online', 'order_date'].min()} -> {orders_df.loc[orders_df['channel'] == 'online', 'order_date'].max()}")
+    print(f"online orders run {orders_df.loc[online_mask, 'order_date'].min()} -> {orders_df.loc[online_mask, 'order_date'].max()}")  # in-store-only
+    print(f"shipped to an address other than the buyer's: {int(orders_df['is_gift_ship'].sum())} of {online_mask.sum()}")
     # Pass 1 — attributable orders. The channel split is allocated exactly rather than drawn
     # per order, so the mix still holds at small N.
     # Pass 2 — anonymous walk-ins and guest checkouts, sized to hit the identity-capture rates
+    # object dtype would make `~is_gift_ship` invert to ints rather than negate
     # rows are date-sorted, so every online order sits at the tail — preview both channels
-    pd.concat([orders_df[orders_df['channel'] == 'in_store'].head(8), orders_df[orders_df['channel'] == 'online'].head(8)])  # in-store-only  # a digital receipt is what links a walk-in to a customer record
+    pd.concat([orders_df[~online_mask].head(6), orders_df[online_mask].head(6)])  # gift orders ship somewhere other than the buyer's own address  # a digital receipt is what links a walk-in to a customer record
     return order_items_df, orders_df, product_ids, sess_rows, session_counter
 
 
@@ -720,6 +789,7 @@ def _(mo):
 @app.cell
 def _(
     LAUNCH_DATE,
+    STATE_ZIP_PREFIX,
     STORE_CLOSE_HOUR,
     STORE_OPEN_HOUR,
     TODAY,
@@ -750,6 +820,8 @@ def _(
     print(f"  In-store : {len(instore):4d} orders  AOV ${instore['order_total'].mean():7.2f}  anonymous {instore['customer_id'].isna().mean():.0%}")
     # --- KPI check (funnel metrics are online-only) ---
     print(f"  Online   : {len(online):4d} orders  AOV ${online['order_total'].mean():7.2f}  guest {online['customer_id'].isna().mean():.0%}")
+    print('\nShip-to states (online)')
+    print(online['shipping_state'].value_counts().to_string())
     sales = order_items_df.merge(products_df, on='product_id').groupby(['product_name', 'category']).agg(units=('quantity', 'sum'), revenue=('line_total', 'sum')).sort_values('units', ascending=False)
     top_share = sales['revenue'].head(round(len(products_df) * 0.2)).sum() / sales['revenue'].sum()
     print('\nTop 8 sellers by units')
@@ -765,8 +837,8 @@ def _(
     assert np.allclose(by_tid['order_total'].values, (by_tid['subtotal'] - by_tid['discount_amount'] + by_tid['shipping_fee'].fillna(0.0)).round(2).values)
     assert orders_df['customer_id'].dropna().isin(customers_df['customer_id']).all()
     assert order_items_df['product_id'].isin(products_df['product_id']).all()
+    online_only = ['session_id', 'shipping_address_line1', 'shipping_city', 'shipping_state', 'shipping_zip', 'shipping_fee', 'fulfillment_type', 'device']
     # --- Best sellers / Pareto ---
-    online_only = ['session_id', 'shipping_state', 'shipping_zip', 'shipping_fee', 'fulfillment_type', 'device']
     instore_only = ['register_id', 'employee_id', 'tip_amount', 'receipt_type']
     assert instore[online_only].isna().all().all()
     assert online[instore_only].isna().all().all()
@@ -774,14 +846,21 @@ def _(
     assert online['session_id'].isin(sessions_df['session_id']).all()
     assert sessions_df.loc[sessions_df['session_id'].isin(online['session_id']), 'converted'].all()
     assert int(sessions_df['converted'].sum()) == len(online)
+    for df_, state_col, zip_col in [(customers_df, 'state', 'zip'), (online, 'shipping_state', 'shipping_zip')]:
+        assert df_.apply(lambda r: r[zip_col].startswith(STATE_ZIP_PREFIX[r[state_col]]), axis=1).all()
+    known_direct = online[online['customer_id'].notna() & ~online['is_gift_ship']]
+    merged = known_direct.merge(customers_df, on='customer_id', suffixes=('', '_cust'))
+    assert (merged['shipping_address_line1'] == merged['address_line1']).all()
+    assert (merged['shipping_zip'] == merged['zip']).all()
     assert instore['hour_of_day'].between(STORE_OPEN_HOUR, STORE_CLOSE_HOUR - 1).all()
     assert (online['order_datetime'] >= LAUNCH_DATE).all()
+    # --- Integrity checks ---
     assert (orders_df['order_datetime'] <= TODAY + pd.Timedelta(days=1)).all()
     assert (customers_df['total_orders'] == orders_df['customer_id'].value_counts().reindex(customers_df['customer_id']).values).all()
-    # --- Integrity checks ---
     # channel exclusivity
+    # addresses: state/zip agree, and non-gift orders ship to the buyer's address on file
     # timing rules
-    print('\nIntegrity checks passed: money, FKs, channel exclusivity, store hours, and launch date all consistent.')
+    print('\nIntegrity checks passed: money, FKs, channel exclusivity, addresses, store hours, and launch date all consistent.')
     return
 
 

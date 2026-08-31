@@ -58,6 +58,11 @@ at signup, so only ~45% of customers have one on file; `age` and `age_band` are 
 and are **null for everyone else**. Age-based analysis has to handle that gap rather than assume
 full coverage.
 
+**The address here is the customer's default / billing address.** It is stored as separate
+components rather than one blob so location analysis can group by state or zip without parsing.
+Customers cluster near the store (Richmond, VA) rather than spreading evenly over all 50 states,
+and the zip prefix is derived from the state so the two always agree.
+
 | Field | Type | Key | Description | Example |
 |---|---|---|---|---|
 | `customer_id` | string | PK | Unique, stable ID for one person; reused across all their orders and sessions | `CUST0042` |
@@ -66,8 +71,11 @@ full coverage.
 | `age` | int | | Years old, derived from `birthdate`; **null when no birthday on file** | `35` |
 | `age_band` | string | | Pre-bucketed age group (18-24 / 25-34 / 35-44 / 45+); **null when no birthday** | `35-44` |
 | `gender` | string | | Self-reported gender (`female` / `male`) | `female` |
+| `address_line1` | string | | Street number and name | `835 Jeremy Bypass` |
+| `address_line2` | string | | Apartment / suite; **nullable**, ~25% of addresses | `Apt. 106` |
+| `city` | string | | City name | `Richardland` |
 | `state` | string | | Two-letter US state; used for Sales by Location | `VA` |
-| `zip` | string | | Postal code; finer location grain than state | `23219` |
+| `zip` | string | | Postal code; prefix always matches `state` | `23219` |
 | `signup_date` | date | | When the account/email was first created; cohort anchor | `2026-01-15` |
 | `acquisition_source` | string | | How the customer first arrived (organic / mailchimp / social / referral) | `mailchimp` |
 | `first_order_date` | date | | Date of first *attributable* purchase, either channel; null if never bought | `2026-01-20` |
@@ -101,11 +109,19 @@ AOV, daily sales, and channel comparison. Header-level only; itemized detail liv
 
 ### Online-only fields (null when `channel = 'in_store'`)
 
+The shipping address is a **snapshot taken at order time**, deliberately duplicated from
+`customers` rather than joined. Addresses change; an order has to record where the parcel
+actually went. Recomputing it from the customer's current address would silently rewrite history.
+
 | Field | Type | Key | Description | Example |
 |---|---|---|---|---|
 | `session_id` | string | FK → sessions | Which website visit produced this order; the join that powers conversion rate | `SESS009912` |
-| `shipping_state` | string | | State the order ships to; may differ from home state | `VA` |
-| `shipping_zip` | string | | Ship-to postal code | `23219` |
+| `shipping_address_line1` | string | | Ship-to street number and name | `835 Jeremy Bypass` |
+| `shipping_address_line2` | string | | Ship-to apartment / suite; nullable | `Apt. 106` |
+| `shipping_city` | string | | Ship-to city | `Richardland` |
+| `shipping_state` | string | | Ship-to state; may differ from the buyer's home state | `VA` |
+| `shipping_zip` | string | | Ship-to postal code; prefix always matches `shipping_state` | `23219` |
+| `is_gift_ship` | bool | | True when the parcel went somewhere other than the buyer's address on file — the gift-order signal | `false` |
 | `shipping_fee` | decimal | | 0 for pickup or orders over the free-shipping threshold | `6.95` |
 | `fulfillment_type` | string | | `ship` or `pickup_in_store` | `ship` |
 | `promo_code` | string | | Code entered at checkout; ties discounts to campaigns. Null when no discount | `MAILCHIMP15` |
@@ -235,6 +251,12 @@ fired event. Needed only for Event Tracking Coverage and funnel drop-off analysi
 - `customers.total_orders` = count of that customer's rows in `orders`, across both channels
 - `customers.first_order_date` = earliest `order_datetime` attributed to that customer
 - `customers.age` / `age_band` are non-null **only** when `customers.birthdate` is non-null
+
+**Addresses**
+- A zip always begins with the prefix registered for its state, on both `customers` and `orders`
+- When `is_gift_ship = false` and `customer_id` is set, the order's shipping address equals that
+  customer's address on file
+- `is_gift_ship = true` for every guest checkout, since there is no address on file to compare against
 
 **Channel**
 - `channel = 'in_store'` → all online-only fields are null and no session exists
