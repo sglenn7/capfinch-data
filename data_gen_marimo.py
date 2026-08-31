@@ -117,6 +117,7 @@ def _(pd):
     P_ONLINE_ATTRIBUTABLE = 0.40  # of known-customer orders, share placed on the website
     INSTORE_ANON_RATE = 0.68      # in-store orders with no customer_id (no receipt captured)
     ONLINE_GUEST_RATE = 0.12      # online orders checked out as a guest
+    BIRTHDATE_CAPTURE_RATE = 0.45  # share of customers who actually hand over a birthday
 
     # ---- Store hours: open daily 10:00-18:00 ----
     STORE_OPEN_HOUR, STORE_CLOSE_HOUR = 10, 18
@@ -134,7 +135,7 @@ def _(pd):
     ONLINE_DOW_W = [0.15, 0.13, 0.13, 0.13, 0.14, 0.15, 0.17]
 
     # ---- Categorical vocabularies ----
-    GENDERS = ["female", "male", "nonbinary"]
+    GENDERS = ["female", "male"]
     ACQ_SOURCES = ["organic", "mailchimp", "social", "referral"]
     DEVICES = ["mobile", "desktop", "tablet"]
     DEVICE_W = [0.62, 0.30, 0.08]
@@ -165,6 +166,7 @@ def _(pd):
     return (
         ACQ_SOURCES,
         BASKET_SIZE,
+        BIRTHDATE_CAPTURE_RATE,
         DECLINE_RATE,
         DEVICES,
         DEVICE_W,
@@ -303,18 +305,19 @@ def _(N_PRODUCTS, np, pd):
         return round(np.floor(np.random.uniform(low, high)) + ending, 2)
 
     def stock_depth(p):
-        """Impulse items are stocked deep, high-ticket anchors thin."""
+        """Small-boutique shelf depth: a handful of cheap impulse items, 1-2 of the anchors."""
         if p < 25:
-            return int(np.random.randint(40, 200))
+            return int(np.random.randint(6, 30))
         if p <= 75:
-            return int(np.random.randint(12, 60))
-        return int(np.random.randint(3, 20))
+            return int(np.random.randint(3, 14))
+        return int(np.random.randint(1, 6))
     products = []
     for _i, (_name, cat, lo, hi) in enumerate(CATALOG[:N_PRODUCTS], start=1):
         price = retail_price(lo, hi)
         products.append({'product_id': f'PROD{_i:04d}', 'product_name': _name, 'category': cat, 'price': price, 'price_band': price_band(price), 'cost': round(price * np.random.uniform(*COST_RATIO[cat]), 2), 'stock_on_hand': stock_depth(price)})
     products_df = pd.DataFrame(products)
     print(f"{len(products_df)} SKUs across {products_df['category'].nunique()} categories")
+    print(f"Units on hand: {products_df['stock_on_hand'].sum()} total, median {int(products_df['stock_on_hand'].median())} per SKU")
     print(products_df.assign(margin=1 - products_df['cost'] / products_df['price']).groupby('category').agg(skus=('product_id', 'count'), low=('price', 'min'), high=('price', 'max'), avg_margin=('margin', 'mean')).round(2).to_string())
     # cost as a share of price — jewelry and bath carry the best margin, food the worst
     products_df
@@ -379,6 +382,11 @@ def _(mo):
     Anonymous walk-ins never appear in this table. `signup_date` is drawn inside the history
     window so every customer exists before their first order; `first_order_date` is filled in
     from the actual orders once they exist.
+
+    **`birthdate` is optional and is the source of truth for age.** Handing over a birthday is
+    opt-in at signup, so only ~45% of customers have one; `age` and `age_band` are derived from it
+    and are **null for everyone else**. Any age-based analysis has to cope with that gap rather than
+    assume full coverage.
     """)
     return
 
@@ -386,6 +394,7 @@ def _(mo):
 @app.cell
 def _(
     ACQ_SOURCES,
+    BIRTHDATE_CAPTURE_RATE,
     GENDERS,
     HISTORY_START,
     N_CUSTOMERS,
@@ -397,6 +406,8 @@ def _(
     repeat_customers,
 ):
     def age_band(a):
+        if a is None:
+            return None
         if a <= 24:
             return '18-24'
         if a <= 34:
@@ -410,10 +421,18 @@ def _(
     signup_window = (TODAY - pd.Timedelta(days=30) - HISTORY_START).days
     customers = []
     for _i in range(1, N_CUSTOMERS + 1):
-        age = int(np.random.randint(18, 66))
+        if random.random() < BIRTHDATE_CAPTURE_RATE:
+            birthdate = fake.date_between(start_date='-66y', end_date='-18y')
+            age = int((TODAY.date() - birthdate).days // 365.25)
+        else:
+            birthdate, age = (None, None)  # birthday is opt-in at signup, so most customers have no age on file
         _signup = HISTORY_START + pd.Timedelta(days=int(np.random.randint(0, signup_window)))
-        customers.append({'customer_id': f'CUST{_i:04d}', 'email': fake.unique.email(), 'age': age, 'age_band': age_band(age), 'gender': random.choice(GENDERS), 'state': fake.state_abbr(), 'zip': fake.zipcode(), 'signup_date': _signup.date(), 'acquisition_source': random.choice(ACQ_SOURCES), 'first_order_date': pd.NaT, 'total_orders': order_counts[_i - 1]})
+        customers.append({'customer_id': f'CUST{_i:04d}', 'email': fake.unique.email(), 'birthdate': birthdate, 'age': age, 'age_band': age_band(age), 'gender': random.choice(GENDERS), 'state': fake.state_abbr(), 'zip': fake.zipcode(), 'signup_date': _signup.date(), 'acquisition_source': random.choice(ACQ_SOURCES), 'first_order_date': pd.NaT, 'total_orders': order_counts[_i - 1]})
     customers_df = pd.DataFrame(customers)
+    customers_df['birthdate'] = pd.to_datetime(customers_df['birthdate'])
+    customers_df['age'] = customers_df['age'].astype('Int64')
+    have_bday = customers_df['birthdate'].notna().sum()
+    print(f'{have_bday}/{len(customers_df)} customers have a birthday on file ({have_bday / len(customers_df):.0%}) — age/age_band are null for the rest')
     customers_df  # filled after orders are built
     return (customers_df,)
 

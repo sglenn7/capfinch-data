@@ -53,13 +53,19 @@ Directory equivalent. Anchor for per-person KPIs like repeat purchase rate, age 
 location. Only people CapFinch can actually identify appear here — anonymous walk-ins never do,
 so not every order links back to a row in this table.
 
+**`birthdate` is optional and is the source of truth for age.** Handing over a birthday is opt-in
+at signup, so only ~45% of customers have one on file; `age` and `age_band` are derived from it
+and are **null for everyone else**. Age-based analysis has to handle that gap rather than assume
+full coverage.
+
 | Field | Type | Key | Description | Example |
 |---|---|---|---|---|
-| `customer_id` | string | PK | Unique, stable ID for one person; reused across all their orders and sessions | `CUST_00042` |
+| `customer_id` | string | PK | Unique, stable ID for one person; reused across all their orders and sessions | `CUST0042` |
 | `email` | string | | Contact address; join key to Mailchimp audience data | `a***@gmail.com` |
-| `age` | int | | Customer age in years at signup | `31` |
-| `age_band` | string | | Pre-bucketed age group (18-24 / 25-34 / 35-44 / 45+) | `25-34` |
-| `gender` | string | | Self-reported gender; optional demographic slice | `F` |
+| `birthdate` | date | | Date of birth; **nullable** — only captured when the customer opts in | `1991-05-10` |
+| `age` | int | | Years old, derived from `birthdate`; **null when no birthday on file** | `35` |
+| `age_band` | string | | Pre-bucketed age group (18-24 / 25-34 / 35-44 / 45+); **null when no birthday** | `35-44` |
+| `gender` | string | | Self-reported gender (`female` / `male`) | `female` |
 | `state` | string | | Two-letter US state; used for Sales by Location | `VA` |
 | `zip` | string | | Postal code; finer location grain than state | `23219` |
 | `signup_date` | date | | When the account/email was first created; cohort anchor | `2026-01-15` |
@@ -157,8 +163,9 @@ impulse and gift items with a few higher-ticket anchors.
 | Pantry & Treats | ~$6–26 | Honey, chocolate, tea, spiced nuts, jam | ~40% |
 
 Each SKU carries its own narrow price range inside the category envelope, so a greeting card never
-prices out like a planner. Prices snap to retail-looking endings (`.00` / `.50` / `.95`), and stock
-depth runs inverse to price — impulse items are stocked deep, anchors thin.
+prices out like a planner. Prices snap to retail-looking endings (`.00` / `.50` / `.95`). Stock is
+kept at **small-boutique depth** — roughly 6–30 units of a cheap impulse item, 3–14 mid-range, and
+only 1–5 of a high-ticket anchor, for a few hundred units on hand across the whole shop.
 
 **Sell-through is deliberately Pareto.** Every SKU gets a popularity weight built from price
 elasticity (cheap impulse items outsell anchors), a hero boost for a handful of designated best
@@ -175,7 +182,7 @@ a column** on this table; Square's catalog export wouldn't contain it.
 | `price` | decimal | | Current list/selling price | `34.00` |
 | `price_band` | string | | Pre-bucketed price tier (<$25 / $25-75 / $75+) | `$25-75` |
 | `cost` | decimal | | Unit cost; ratio to price varies by category | `16.53` |
-| `stock_on_hand` | int | | Current inventory units; feeds Inventory Sync Accuracy | `32` |
+| `stock_on_hand` | int | | Current inventory units; feeds Inventory Sync Accuracy | `11` |
 
 ---
 
@@ -227,6 +234,7 @@ fired event. Needed only for Event Tracking Coverage and funnel drop-off analysi
 - Every `orders.session_id` must exist in `sessions`
 - `customers.total_orders` = count of that customer's rows in `orders`, across both channels
 - `customers.first_order_date` = earliest `order_datetime` attributed to that customer
+- `customers.age` / `age_band` are non-null **only** when `customers.birthdate` is non-null
 
 **Channel**
 - `channel = 'in_store'` → all online-only fields are null and no session exists
