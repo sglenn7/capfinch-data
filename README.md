@@ -24,7 +24,116 @@ The dataset is organized around two anchor keys:
 These join together via `customer_id`, which is a foreign key inside `orders`. This lets us
 analyze the data both per-sale and per-customer.
 
-**Relationship chain**
+## Entity relationship diagram
+
+Also available as images for slides and docs: [erd.svg](erd.svg) (vector) and [erd.png](erd.png)
+(2x raster). Regenerate both after a schema change with `python render_erd.py`.
+
+```mermaid
+erDiagram
+    customers {
+        string customer_id PK
+        string email
+        date   birthdate  "nullable, ~45% captured"
+        int    age        "derived, null without birthdate"
+        string age_band   "derived, null without birthdate"
+        string gender
+        string address_line1
+        string address_line2 "nullable"
+        string city
+        string state
+        string zip
+        date   signup_date
+        string acquisition_source
+        date   first_order_date "backfilled from orders"
+        int    total_orders     "attributable orders only"
+    }
+
+    orders {
+        string  transaction_id PK
+        string  customer_id FK "NULLABLE - anonymous walk-ins and guests"
+        string  channel        "in_store or online"
+        ts      order_datetime
+        decimal subtotal
+        decimal discount_amount
+        decimal order_total
+        int     item_count
+        string  payment_method
+        string  payment_status
+        string  session_id FK "online only"
+        string  shipping_address_line1 "online only, snapshot"
+        string  shipping_state         "online only, snapshot"
+        string  shipping_zip           "online only, snapshot"
+        bool    is_gift_ship           "online only"
+        decimal shipping_fee           "online only"
+        string  fulfillment_type       "online only"
+        string  register_id            "in-store only"
+        string  employee_id            "in-store only"
+        string  entry_method           "in-store only"
+        decimal tip_amount             "in-store only"
+        string  receipt_type           "in-store only"
+    }
+
+    order_items {
+        string  order_item_id PK
+        string  transaction_id FK
+        string  product_id FK
+        int     quantity
+        decimal unit_price
+        decimal line_total
+    }
+
+    products {
+        string  product_id PK
+        string  product_name
+        string  category
+        decimal price
+        string  price_band
+        decimal cost
+        int     stock_on_hand
+    }
+
+    sessions {
+        string session_id PK
+        string customer_id FK "nullable - anonymous visitors"
+        ts     session_start
+        string device
+        string traffic_source
+        string landing_page
+        bool   reached_cart
+        bool   converted
+    }
+
+    events {
+        string event_id PK
+        string session_id FK
+        string event_type
+        string product_id FK "nullable - page views have none"
+        ts     event_time
+    }
+
+    customers |o--o{ orders   : "places (nullable FK)"
+    customers |o--o{ sessions : "browses (nullable FK)"
+    sessions  ||--o| orders   : "converts into (online only)"
+    sessions  ||--|{ events   : "logs"
+    orders    ||--|{ order_items : "contains"
+    products  ||--o{ order_items : "sold as"
+    products  |o--o{ events      : "viewed in"
+```
+
+**Reading the cardinality**
+
+- `customers |o--o{ orders` — a customer has any number of orders, but an order has **zero or one**
+  customer. That optionality is the single most important thing in this model: ~68% of in-store
+  orders and ~12% of online orders have no `customer_id` at all. Any inner join from `orders` to
+  `customers` silently drops the majority of in-store revenue.
+- `sessions ||--o| orders` — every online order comes from exactly one session, and a session
+  converts into at most one order. In-store orders have no session, which is why the funnel KPIs
+  are online-only.
+- `orders ||--|{ order_items` — every order has at least one line item.
+- `products |o--o{ events` — `product_id` is null on generic page views.
+
+**Simplified chain**
 
 ```
 customers ─┬─ sessions ── events          (online only)
