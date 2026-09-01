@@ -212,7 +212,7 @@
   <text x="1244" y="450" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">decimal</text>
   <text x="972" y="469" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">line_total</text>
   <text x="1244" y="469" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">decimal</text>
-  <rect x="960" y="560" width="320" height="171" rx="8" fill="#ffffff" stroke="#4f9d69" stroke-width="1.5"/>
+  <rect x="960" y="560" width="320" height="190" rx="8" fill="#ffffff" stroke="#4f9d69" stroke-width="1.5"/>
   <path d="M960 568 a8 8 0 0 1 8 -8 h304 a8 8 0 0 1 8 8 v22 h-320 z" fill="#eaf4ec"/>
   <text x="972" y="580" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="14" font-weight="700" fill="#1f2933">products</text>
   <text x="1268" y="580" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="9.5" text-anchor="end" fill="#7b8794">the catalog, one row per SKU</text>
@@ -224,14 +224,16 @@
   <text x="1244" y="623" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">string</text>
   <text x="972" y="642" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">category</text>
   <text x="1244" y="642" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">string</text>
-  <text x="972" y="661" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">price</text>
-  <text x="1244" y="661" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">decimal</text>
-  <text x="972" y="680" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">price_band</text>
-  <text x="1244" y="680" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">string</text>
-  <text x="972" y="699" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">cost</text>
-  <text x="1244" y="699" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">decimal</text>
-  <text x="972" y="718" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">stock_on_hand</text>
-  <text x="1244" y="718" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">int</text>
+  <text x="972" y="661" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">subcategory</text>
+  <text x="1244" y="661" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">string</text>
+  <text x="972" y="680" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">price</text>
+  <text x="1244" y="680" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">decimal</text>
+  <text x="972" y="699" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">price_band</text>
+  <text x="1244" y="699" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">string</text>
+  <text x="972" y="718" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">cost</text>
+  <text x="1244" y="718" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">decimal</text>
+  <text x="972" y="737" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="400" fill="#1f2933">stock_on_hand</text>
+  <text x="1244" y="737" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" text-anchor="end" fill="#7b8794">int</text>
   <text x="40" y="1018" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="11.5" fill="#7b8794">Cardinality is read at each line end. <tspan fill="#b44d12" font-weight="600">Orange</tspan> fields are nullable. Note <tspan font-weight="600">customer_id</tspan> on orders: ~68% of in-store and ~12% of online orders have none, so an inner join to customers drops most in-store revenue.</text>
   <text x="40" y="1036" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="11.5" fill="#7b8794">Shipping fields on orders are a snapshot taken at order time, not a join to the customer&#8217;s current address. Sessions and events exist for online orders only.</text>
   <rect x="40" y="1046" width="14" height="12" rx="3" fill="#eaf4ec" stroke="#4f9d69"/>

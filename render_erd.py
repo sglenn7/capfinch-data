@@ -149,6 +149,7 @@ TABLES = {
             ("product_id", "string", "PK", False),
             ("product_name", "string", "", False),
             ("category", "string", "", False),
+            ("subcategory", "string", "", False),
             ("price", "decimal", "", False),
             ("price_band", "string", "", False),
             ("cost", "decimal", "", False),

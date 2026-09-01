@@ -87,6 +87,7 @@ erDiagram
         string  product_id PK
         string  product_name
         string  category
+        string  subcategory
         decimal price
         string  price_band
         decimal cost
@@ -275,22 +276,31 @@ analysis.
 Catalog equivalent). Attaches category, price, and margin to each line item; supports Inventory
 Sync Accuracy.
 
-CapFinch is a gift-and-everyday boutique: 30 SKUs across six categories, mixing low-ticket
-impulse and gift items with a few higher-ticket anchors.
+CapFinch is a boutique carrying 38 SKUs across 5 main categories and 19 subcategories.
 
-| Category | Price envelope | Typical items | Gross margin |
-|---|---|---|---|
-| Stationery | ~$5–40 | Cards, notebooks, pens, planners, washi tape | ~50% |
-| Home | ~$24–110 | Candles, vases, frames, diffusers, throws | ~55% |
-| Accessories | ~$18–88 | Jewelry, hats, scarves, small leather goods | ~60% |
-| Kitchen & Table | ~$12–95 | Mugs, tea towels, boards, salt cellars, kettles | ~50% |
-| Bath & Body | ~$8–56 | Soap, hand cream, bath salts, lip balm, body oil | ~60% |
-| Pantry & Treats | ~$6–26 | Honey, chocolate, tea, spiced nuts, jam | ~40% |
+| Category | Subcategory | Price Range |
+|---|---|---|
+| **Apparel** | Tops | $35–$85 |
+| | Dresses | $65–$185 |
+| | Outerwear | $95–$250 |
+| | Bottoms | $55–$120 |
+| | Denim | $80–$160 |
+| **Accessories** | Jewelry (everyday) | $20–$65 |
+| | Jewelry (statement/special occasion) | $65–$150 |
+| | Handbags | $75–$220 |
+| | Scarves & wraps | $30–$70 |
+| | Belts | $25–$55 |
+| | Sunglasses | $30–$90 |
+| **Footwear** | Sandals/flats | $50–$95 |
+| | Boots | $110–$220 |
+| | Heels | $70–$140 |
+| **Home & Gift** | Candles | $18–$38 |
+| | Small home decor | $25–$60 |
+| | Gift sets | $35–$75 |
+| **Beauty/Wellness** | Skincare | $20–$55 |
+| | Fragrance | $45–$95 |
 
-Each SKU carries its own narrow price range inside the category envelope, so a greeting card never
-prices out like a planner. Prices snap to retail-looking endings (`.00` / `.50` / `.95`). Stock is
-kept at **small-boutique depth** — roughly 6–30 units of a cheap impulse item, 3–14 mid-range, and
-only 1–5 of a high-ticket anchor, for a few hundred units on hand across the whole shop.
+Prices and costs end in `.99` or round numbers (`.00`). Stock is kept at **small-boutique depth** — roughly 6–35 units.
 
 **Sell-through is deliberately Pareto.** Every SKU gets a popularity weight built from price
 elasticity (cheap impulse items outsell anchors), a hero boost for a handful of designated best
@@ -301,13 +311,14 @@ a column** on this table; Square's catalog export wouldn't contain it.
 
 | Field | Type | Key | Description | Example |
 |---|---|---|---|---|
-| `product_id` | string | PK | Unique SKU identifier | `PROD0006` |
-| `product_name` | string | | Human-readable product name | `Soy Wax Candle` |
-| `category` | string | | One of the six categories above; used for Category Mix | `Home` |
-| `price` | decimal | | Current list/selling price | `34.00` |
-| `price_band` | string | | Pre-bucketed price tier (<$25 / $25-75 / $75+) | `$25-75` |
-| `cost` | decimal | | Unit cost; ratio to price varies by category | `16.53` |
-| `stock_on_hand` | int | | Current inventory units; feeds Inventory Sync Accuracy | `11` |
+| `product_id` | string | PK | Unique SKU identifier | `PROD0001` |
+| `product_name` | string | | Human-readable product name | `Ribbed Cotton Knit Tee` |
+| `category` | string | | Main merchandise category | `Apparel` |
+| `subcategory` | string | | Specific product subcategory | `Tops` |
+| `price` | decimal | | Current list/selling price | `38.00` |
+| `price_band` | string | | Pre-bucketed price tier (<$50 / $50-100 / $100-200 / $200+) | `$50-100` |
+| `cost` | decimal | | Unit cost | `15.00` |
+| `stock_on_hand` | int | | Current inventory units | `24` |
 
 ---
 

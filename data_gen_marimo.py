@@ -101,7 +101,7 @@ def _(mo):
 def _(pd):
     # ---- Scale (raise this to grow every table; KPI ratios are preserved) ----
     N_CUSTOMERS = 15
-    N_PRODUCTS = 30  # catalog holds 30 SKUs across 6 categories; lower this to trim it
+    N_PRODUCTS = 38  # catalog holds 38 SKUs across 5 categories and 19 subcategories
 
     # ---- Timeline: in-store history predates the website ----
     TODAY = pd.Timestamp("2026-08-31").normalize()
@@ -323,61 +323,41 @@ def _(mo):
     ## Table 4 — `products`  [PK: product_id]
     Built first because orders/order_items and events reference it.
 
-    CapFinch is a gift-and-everyday boutique, so the catalog spans six categories mixing low-ticket
-    impulse/gift items with a few higher-ticket anchors:
+    CapFinch is a boutique carrying 38 SKUs across 5 main categories and 19 subcategories:
 
-    | Category | Envelope | What's in it |
+    | Category | Subcategory | Price Range |
     |---|---|---|
-    | Stationery | ~$5–40 | Cards, notebooks, pens, planners, washi tape |
-    | Home | ~$24–110 | Candles, vases, frames, diffusers, throws |
-    | Accessories | ~$18–88 | Jewelry, hats, scarves, small leather goods |
-    | Kitchen & Table | ~$12–95 | Mugs, tea towels, boards, salt cellars, kettles |
-    | Bath & Body | ~$8–56 | Soap, hand cream, bath salts, lip balm, body oil |
-    | Pantry & Treats | ~$6–26 | Honey, chocolate, tea, spiced nuts, jam |
+    | Apparel | Tops, Dresses, Outerwear, Bottoms, Denim | $35–$250 |
+    | Accessories | Jewelry (everyday), Jewelry (statement), Handbags, Scarves & wraps, Belts, Sunglasses | $20–$220 |
+    | Footwear | Sandals/flats, Boots, Heels | $50–$220 |
+    | Home & Gift | Candles, Small home decor, Gift sets | $18–$75 |
+    | Beauty/Wellness | Skincare, Fragrance | $20–$95 |
 
-    Each product carries its own narrow price range rather than drawing from the whole category
-    envelope — a greeting card should never price out at $38. Prices are then snapped to retail-looking
-    endings (`.00` / `.50` / `.95`). Cost ratios vary by category: jewelry and bath carry the best
-    margin, pantry food the worst. Stock depth is inverse to price — cheap impulse items are stocked
-    deep, high-ticket anchors are stocked thin.
+    Prices and costs end in `.99` or round numbers (`.00`). Stock depth is inverse to price — cheap impulse items are stocked deep, high-ticket anchors are stocked thin.
     """)
     return
 
 
 @app.cell
-def _(N_PRODUCTS, np, pd):
-    # (product_name, category, price_low, price_high)
-    CATALOG = [('Letterpress Greeting Card', 'Stationery', 5, 8), ('A5 Linen Notebook', 'Stationery', 16, 24), ('Brass Fountain Pen', 'Stationery', 28, 40), ('Weekly Desk Planner', 'Stationery', 18, 28), ('Washi Tape Trio', 'Stationery', 9, 14), ('Soy Wax Candle', 'Home', 26, 38), ('Speckled Ceramic Vase', 'Home', 34, 52), ('Linen Throw Blanket', 'Home', 78, 110), ('Brass Picture Frame', 'Home', 24, 38), ('Reed Diffuser', 'Home', 32, 46), ('Gold Vermeil Hoops', 'Accessories', 48, 72), ('Wool Felt Hat', 'Accessories', 62, 88), ('Silk Twill Scarf', 'Accessories', 54, 78), ('Leather Card Holder', 'Accessories', 34, 48), ('Beaded Bracelet', 'Accessories', 18, 28), ('Stoneware Mug', 'Kitchen & Table', 16, 24), ('Linen Tea Towel', 'Kitchen & Table', 12, 18), ('Olive Wood Board', 'Kitchen & Table', 44, 68), ('Marble Salt Cellar', 'Kitchen & Table', 26, 38), ('Enamel Stovetop Kettle', 'Kitchen & Table', 68, 95), ('Oatmeal Soap Bar', 'Bath & Body', 8, 12), ('Shea Hand Cream', 'Bath & Body', 18, 26), ('Mineral Bath Salts', 'Bath & Body', 22, 32), ('Tinted Lip Balm', 'Bath & Body', 9, 14), ('Neroli Body Oil', 'Bath & Body', 38, 56), ('Wildflower Honey', 'Pantry & Treats', 14, 20), ('Sea Salt Chocolate Bar', 'Pantry & Treats', 6, 10), ('Loose Leaf Tea Tin', 'Pantry & Treats', 18, 26), ('Rosemary Spiced Nuts', 'Pantry & Treats', 9, 14), ('Small-Batch Fig Jam', 'Pantry & Treats', 12, 18)]
-    COST_RATIO = {'Stationery': (0.45, 0.55), 'Home': (0.4, 0.5), 'Accessories': (0.32, 0.45), 'Kitchen & Table': (0.45, 0.55), 'Bath & Body': (0.35, 0.48), 'Pantry & Treats': (0.55, 0.68)}
+def _(N_PRODUCTS, pd):
+    # (product_name, category, subcategory, price, cost, stock_on_hand)
+    CATALOG = [('Ribbed Cotton Knit Tee', 'Apparel', 'Tops', 38.0, 15.0, 24), ('Silk Button-Down Blouse', 'Apparel', 'Tops', 78.0, 31.0, 12), ('Linen Midi Wrap Dress', 'Apparel', 'Dresses', 128.0, 51.0, 8), ('Tiered Floral Maxi Dress', 'Apparel', 'Dresses', 149.99, 60.0, 6), ('Tailored Wool Cardigan', 'Apparel', 'Outerwear', 120.0, 48.0, 6), ('Structured Utility Jacket', 'Apparel', 'Outerwear', 225.0, 90.0, 4), ('Pleated High-Waist Trousers', 'Apparel', 'Bottoms', 88.0, 35.0, 10), ('A-Line Midi Skirt', 'Apparel', 'Bottoms', 68.0, 27.0, 12), ('Straight-Leg Ankle Denim', 'Apparel', 'Denim', 118.0, 47.0, 14), ('Wide-Leg High-Rise Jean', 'Apparel', 'Denim', 139.99, 56.0, 10), ('Gold Vermeil Hoop Earrings', 'Accessories', 'Jewelry (everyday)', 48.0, 19.0, 18), ('Minimalist Chain Necklace', 'Accessories', 'Jewelry (everyday)', 35.0, 14.0, 22), ('Freshwater Pearl Drop Earrings', 'Accessories', 'Jewelry (statement/special occasion)', 85.0, 34.0, 8), ('Chunky Statement Cuff', 'Accessories', 'Jewelry (statement/special occasion)', 98.0, 39.0, 6), ('Leather Crossbody Bag', 'Accessories', 'Handbags', 145.0, 58.0, 8), ('Canvas Carryall Tote', 'Accessories', 'Handbags', 95.0, 38.0, 12), ('Silk Twill Scarf', 'Accessories', 'Scarves & wraps', 58.0, 23.0, 15), ('Cashmere Blend Wrap', 'Accessories', 'Scarves & wraps', 68.0, 27.0, 10), ('Classic Leather Belt', 'Accessories', 'Belts', 45.0, 18.0, 16), ('Woven Waist Belt', 'Accessories', 'Belts', 32.0, 12.0, 18), ('Cat-Eye Acetate Sunglasses', 'Accessories', 'Sunglasses', 65.0, 26.0, 14), ('Classic Aviator Sunglasses', 'Accessories', 'Sunglasses', 48.0, 19.0, 16), ('Leather Slide Sandals', 'Footwear', 'Sandals/flats', 68.0, 27.0, 12), ('Pointed-Toe Ballet Flats', 'Footwear', 'Sandals/flats', 85.0, 34.0, 10), ('Ankle Leather Chelsea Boots', 'Footwear', 'Boots', 165.0, 66.0, 6), ('Suede Tall Riding Boots', 'Footwear', 'Boots', 210.0, 84.0, 4), ('Strappy Block-Heel Pumps', 'Footwear', 'Heels', 98.0, 39.0, 8), ('Classic Kitten Heels', 'Footwear', 'Heels', 88.0, 35.0, 10), ('Soy Wax Signature Candle', 'Home & Gift', 'Candles', 28.0, 11.0, 24), ('Botanical Glass Candle', 'Home & Gift', 'Candles', 34.0, 13.0, 18), ('Speckled Ceramic Vase', 'Home & Gift', 'Small home decor', 42.0, 18.0, 10), ('Brass Picture Frame', 'Home & Gift', 'Small home decor', 35.0, 15.0, 14), ('Self-Care Bath Gift Set', 'Home & Gift', 'Gift sets', 58.0, 26.0, 12), ('Artisanal Tea & Mug Set', 'Home & Gift', 'Gift sets', 45.0, 20.0, 15), ('Hydrating Facial Oil', 'Beauty/Wellness', 'Skincare', 38.0, 13.0, 16), ('Nourishing Botanical Cleanser', 'Beauty/Wellness', 'Skincare', 27.99, 9.0, 20), ('Eau de Parfum Travel Spray', 'Beauty/Wellness', 'Fragrance', 52.0, 18.0, 14), ('Botanical Roll-On Perfume Oil', 'Beauty/Wellness', 'Fragrance', 68.0, 23.0, 12)]
 
     def price_band(p):
-        if p < 25:
-            return '<$25'
-        if p <= 75:
-            return '$25-75'
-        return '$75+'
-
-    def retail_price(low, high):
-        """Draw in range, then snap to a retail-looking ending."""
-        ending = float(np.random.choice([0.0, 0.5, 0.95], p=[0.45, 0.25, 0.3]))
-        return round(np.floor(np.random.uniform(low, high)) + ending, 2)
-
-    def stock_depth(p):
-        """Small-boutique shelf depth: a handful of cheap impulse items, 1-2 of the anchors."""
-        if p < 25:
-            return int(np.random.randint(6, 30))
-        if p <= 75:
-            return int(np.random.randint(3, 14))
-        return int(np.random.randint(1, 6))
+        if p < 50:
+            return '<$50'
+        if p < 100:
+            return '$50-100'
+        if p < 200:
+            return '$100-200'
+        return '$200+'
     products = []
-    for _i, (_name, cat, lo, hi) in enumerate(CATALOG[:N_PRODUCTS], start=1):
-        price = retail_price(lo, hi)
-        products.append({'product_id': f'PROD{_i:04d}', 'product_name': _name, 'category': cat, 'price': price, 'price_band': price_band(price), 'cost': round(price * np.random.uniform(*COST_RATIO[cat]), 2), 'stock_on_hand': stock_depth(price)})
+    for _i, (_name, cat, subcat, price, cost, stock) in enumerate(CATALOG[:N_PRODUCTS], start=1):
+        products.append({'product_id': f'PROD{_i:04d}', 'product_name': _name, 'category': cat, 'subcategory': subcat, 'price': price, 'price_band': price_band(price), 'cost': cost, 'stock_on_hand': stock})
     products_df = pd.DataFrame(products)
     print(f"{len(products_df)} SKUs across {products_df['category'].nunique()} categories")
     print(f"Units on hand: {products_df['stock_on_hand'].sum()} total, median {int(products_df['stock_on_hand'].median())} per SKU")
-    print(products_df.assign(margin=1 - products_df['cost'] / products_df['price']).groupby('category').agg(skus=('product_id', 'count'), low=('price', 'min'), high=('price', 'max'), avg_margin=('margin', 'mean')).round(2).to_string())
-    # cost as a share of price — jewelry and bath carry the best margin, food the worst
+    print(products_df.assign(margin=1 - products_df['cost'] / products_df['price']).groupby(['category', 'subcategory']).agg(skus=('product_id', 'count'), low=('price', 'min'), high=('price', 'max'), avg_margin=('margin', 'mean')).round(2).to_string())
     products_df
     return (products_df,)
 
@@ -407,11 +387,11 @@ def _(mo):
 def _(np, products_df):
     # SKUs that sell above what price alone would predict
     HERO_SKUS = {
-        "Soy Wax Candle",
-        "Letterpress Greeting Card",
-        "Stoneware Mug",
-        "Shea Hand Cream",
-        "Gold Vermeil Hoops",
+        "Soy Wax Signature Candle",
+        "Gold Vermeil Hoop Earrings",
+        "Silk Button-Down Blouse",
+        "Hydrating Facial Oil",
+        "Leather Crossbody Bag",
     }
     PRICE_ELASTICITY = 0.6  # higher = cheap items dominate more
     HERO_BOOST = 3.5
