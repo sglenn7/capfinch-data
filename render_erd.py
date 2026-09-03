@@ -20,7 +20,7 @@ HEADER_H = 30
 SECTION_H = 17
 PAD_X = 12
 PORT_GAP = 22          # vertical spacing when several edges share one side
-OUTER_X = 1330         # channel used to route around the right-hand column
+OUTER_X = 1290         # right edge for the drawing canvas
 FONT = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
 LABEL_FONT = "system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
 
@@ -72,18 +72,6 @@ TABLES = {
             ("landing_page", "string", "", False),
             ("reached_cart", "bool", "", False),
             ("converted", "bool", "", False),
-        ],
-    },
-    "events": {
-        "kind": "log",
-        "at": (960, 70),
-        "subtitle": "funnel step log",
-        "fields": [
-            ("event_id", "string", "PK", False),
-            ("session_id", "string", "FK", False),
-            ("event_type", "string", "", False),
-            ("product_id", "string", "FK", True),
-            ("event_time", "timestamp", "", False),
         ],
     },
     "orders": {
@@ -162,11 +150,9 @@ TABLES = {
 EDGES = [
     ("customers", "right", 0, "sessions", "left", 0, "0..1", "0..N", "browses", "hv"),
     ("customers", "right", 1, "orders", "left", 0, "0..1", "0..N", "places", "hv"),
-    ("sessions", "right", 0, "events", "left", 0, "1", "1..N", "logs", "hv"),
     ("sessions", "bottom", 0, "orders", "top", 0, "1", "0..1", "converts into", "vh"),
     ("orders", "right", 0, "order_items", "left", 0, "1", "1..N", "contains", "hv"),
     ("products", "top", 0, "order_items", "bottom", 0, "1", "0..N", "sold as", "vh"),
-    ("products", "right", 0, "events", "right", 0, "0..1", "0..N", "viewed in", "outer"),
 ]
 
 PALETTE = {
@@ -324,7 +310,7 @@ def build_svg() -> str:
         f'and ~12% of online orders have none, so an inner join to customers drops most in-store revenue.</text>',
         f'<text x="40" y="{ly + 18}" font-family="{LABEL_FONT}" font-size="11.5" fill="{MUTED}">'
         f'Shipping fields on orders are a snapshot taken at order time, not a join to the customer&#8217;s '
-        f'current address. Sessions and events exist for online orders only.</text>',
+        f'current address. Sessions exist for online activity only.</text>',
     ]
 
     for i, (kind, text) in enumerate([("dim", "dimension"), ("fact", "fact"), ("log", "web log")]):

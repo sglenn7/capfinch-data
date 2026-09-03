@@ -27,7 +27,12 @@ analyze the data both per-sale and per-customer.
 ## Entity relationship diagram
 
 Also available as images for slides and docs: [erd.svg](erd.svg) (vector) and [erd.png](erd.png)
-(2x raster). Regenerate both after a schema change with `python render_erd.py`.
+(raster). Regenerate both after a schema change with:
+
+```bash
+python render_erd.py
+python -m cairosvg erd.svg -o erd.png -f png
+```
 
 ```mermaid
 erDiagram
@@ -54,6 +59,9 @@ erDiagram
         string  customer_id FK "NULLABLE - anonymous walk-ins and guests"
         string  channel        "in_store or online"
         ts      order_datetime
+        date    order_date
+        string  day_of_week
+        int     hour_of_day
         decimal subtotal
         decimal discount_amount
         decimal order_total
@@ -62,11 +70,15 @@ erDiagram
         string  payment_status
         string  session_id FK "online only"
         string  shipping_address_line1 "online only, snapshot"
+        string  shipping_address_line2 "online only, snapshot"
+        string  shipping_city          "online only, snapshot"
         string  shipping_state         "online only, snapshot"
         string  shipping_zip           "online only, snapshot"
         bool    is_gift_ship           "online only"
         decimal shipping_fee           "online only"
         string  fulfillment_type       "online only"
+        string  promo_code             "online only"
+        string  device                 "online only"
         string  register_id            "in-store only"
         string  employee_id            "in-store only"
         string  entry_method           "in-store only"
@@ -105,21 +117,11 @@ erDiagram
         bool   converted
     }
 
-    events {
-        string event_id PK
-        string session_id FK
-        string event_type
-        string product_id FK "nullable - page views have none"
-        ts     event_time
-    }
-
     customers |o--o{ orders   : "places (nullable FK)"
     customers |o--o{ sessions : "browses (nullable FK)"
     sessions  ||--o| orders   : "converts into (online only)"
-    sessions  ||--|{ events   : "logs"
     orders    ||--|{ order_items : "contains"
     products  ||--o{ order_items : "sold as"
-    products  |o--o{ events      : "viewed in"
 ```
 
 **Reading the cardinality**
@@ -132,12 +134,13 @@ erDiagram
   converts into at most one order. In-store orders have no session, which is why the funnel KPIs
   are online-only.
 - `orders ||--|{ order_items` — every order has at least one line item.
-- `products |o--o{ events` — `product_id` is null on generic page views.
+- `products ||--o{ order_items` — every line item references one SKU, while a SKU can appear in
+  many line items or none in a small sample.
 
 **Simplified chain**
 
 ```
-customers ─┬─ sessions ── events          (online only)
+customers ─┬─ sessions          (online only)
            └─ orders ── order_items ── products
 ```
 
@@ -304,10 +307,10 @@ Prices and costs end in `.99` or round numbers (`.00`). Stock is kept at **small
 
 **Sell-through is deliberately Pareto.** Every SKU gets a popularity weight built from price
 elasticity (cheap impulse items outsell anchors), a hero boost for a handful of designated best
-sellers, and a lognormal taste jitter. That weight drives both what gets bought (`order_items`) and
-what gets browsed (`product_view` events), so top-seller and 80/20 analysis is meaningful and a few
-SKUs land with zero sales — as they would in a real catalog. The weight is a **generator input, not
-a column** on this table; Square's catalog export wouldn't contain it.
+sellers, and a lognormal taste jitter. That weight drives what gets bought (`order_items`), so
+top-seller and 80/20 analysis is meaningful and a few SKUs land with zero sales — as they would in
+a real catalog. The weight is a **generator input, not a column** on this table; Square's catalog
+export wouldn't contain it.
 
 | Field | Type | Key | Description | Example |
 |---|---|---|---|---|
@@ -339,22 +342,6 @@ neither side of the conversion ratio. All sessions fall on or after the site lau
 | `landing_page` | string | | First page the visitor hit | `/home` |
 | `reached_cart` | bool | | True if visitor added to cart; denominator for abandonment | `true` |
 | `converted` | bool | | True if the visit ended in a completed order; numerator for conversion | `true` |
-
----
-
-## Table 6: `events` (optional)
-
-**Purpose:** The granular funnel log (the "every step a visitor took"), GA4-style. One row per
-fired event. Needed only for Event Tracking Coverage and funnel drop-off analysis. The
-`reached_cart` / `converted` flags on `sessions` are a lighter substitute.
-
-| Field | Type | Key | Description | Example |
-|---|---|---|---|---|
-| `event_id` | string | PK | Unique ID for one tracked event | `EVT_0455120` |
-| `session_id` | string | FK → sessions | Which visit the event occurred in | `SESS_09912` |
-| `event_type` | string | | Funnel step (page_view / product_view / add_to_cart / checkout_start / purchase) | `add_to_cart` |
-| `product_id` | string | FK → products (nullable) | Product involved; null for generic page views | `PROD_0087` |
-| `event_time` | timestamp | | Exact time the event fired; orders steps within a session | `2026-03-04 14:07` |
 
 ---
 
