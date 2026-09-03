@@ -65,7 +65,7 @@ def _(mo):
 @app.cell
 def _(pd):
     # ---- Scale (raise this to grow every table; KPI ratios are preserved) ----
-    N_CUSTOMERS = 15
+    N_CUSTOMERS = 500
     N_PRODUCTS = 38  # catalog holds 38 SKUs across 5 categories and 19 subcategories
 
     # ---- Timeline: in-store history predates the website ----
@@ -766,48 +766,276 @@ def _(mo):
 
 @app.cell
 def _(
+    mo,
+    orders_df,
+    products_df,
+    pd,
+):
+    order_dates = pd.to_datetime(orders_df["order_date"])
+    min_date = order_dates.min().date()
+    max_date = order_dates.max().date()
+
+    channel_filter = mo.ui.radio(
+        options=["All channels", "In-store", "Online"],
+        value="All channels",
+        inline=True,
+        label="Channel",
+    )
+    metric_picker = mo.ui.radio(
+        options=["Revenue", "Orders", "Units sold", "AOV"],
+        value="Revenue",
+        inline=True,
+        label="Sales trend",
+    )
+    product_options = ["All products"] + [
+        f"{row.product_name} ({row.category})"
+        for row in products_df.sort_values(["category", "product_name"]).itertuples()
+    ]
+    product_picker = mo.ui.dropdown(
+        product_options,
+        value="All products",
+        searchable=True,
+        label="Product",
+        full_width=True,
+    )
+    start_date_picker = mo.ui.date(
+        start=min_date,
+        stop=max_date,
+        value=min_date,
+        label="Start date",
+        full_width=True,
+    )
+    end_date_picker = mo.ui.date(
+        start=min_date,
+        stop=max_date,
+        value=max_date,
+        label="End date",
+        full_width=True,
+    )
+    top_n_slider = mo.ui.slider(
+        start=5,
+        stop=15,
+        step=1,
+        value=10,
+        show_value=True,
+        label="Top products shown",
+    )
+
+    kpi_controls = mo.vstack(
+        [
+            mo.hstack([channel_filter, metric_picker, top_n_slider], widths=[1, 1, 1]),
+            mo.hstack([start_date_picker, end_date_picker, product_picker], widths=[1, 1, 2]),
+        ]
+    )
+    return channel_filter, end_date_picker, kpi_controls, metric_picker, product_picker, start_date_picker, top_n_slider
+
+
+@app.cell
+def _(
     alt,
+    channel_filter,
     customers_df,
+    end_date_picker,
+    kpi_controls,
+    metric_picker,
     mo,
     order_items_df,
     orders_df,
     pd,
+    product_picker,
     products_df,
     sessions_df,
+    start_date_picker,
+    top_n_slider,
 ):
-    online_orders = orders_df[orders_df["channel"] == "online"].copy()
-    authorized_orders = orders_df[orders_df["payment_status"] == "authorized"].copy()
+    start_date = min(start_date_picker.value, end_date_picker.value)
+    end_date = max(start_date_picker.value, end_date_picker.value)
+    channel_value = {
+        "All channels": "all",
+        "In-store": "in_store",
+        "Online": "online",
+    }[channel_filter.value]
+    product_lookup = {
+        f"{row.product_name} ({row.category})": row.product_id
+        for row in products_df.sort_values(["category", "product_name"]).itertuples()
+    }
+    product_value = product_lookup.get(product_picker.value)
+    selected_product = product_value is not None
+    top_n = int(top_n_slider.value)
+
+    orders = orders_df.copy()
+    orders["order_day"] = pd.to_datetime(orders["order_date"])
+    sessions = sessions_df.copy()
+    sessions["session_day"] = pd.to_datetime(sessions["session_start"]).dt.normalize()
+    start_day = pd.Timestamp(start_date)
+    end_day = pd.Timestamp(end_date)
+
+    filtered_orders = orders[orders["order_day"].between(start_day, end_day)].copy()
+    if channel_value != "all":
+        filtered_orders = filtered_orders[filtered_orders["channel"] == channel_value].copy()
+    authorized_orders = filtered_orders[filtered_orders["payment_status"] == "authorized"].copy()
+
+    sales_lines = (
+        order_items_df.merge(products_df, on="product_id", how="left")
+        .merge(
+            orders[
+                [
+                    "transaction_id",
+                    "customer_id",
+                    "channel",
+                    "order_day",
+                    "day_of_week",
+                    "hour_of_day",
+                    "payment_status",
+                    "shipping_state",
+                ]
+            ],
+            on="transaction_id",
+            how="left",
+        )
+    )
+    sales_lines = sales_lines[
+        sales_lines["order_day"].between(start_day, end_day)
+        & (sales_lines["payment_status"] == "authorized")
+    ].copy()
+    if selected_product:
+        sales_lines = sales_lines[sales_lines["product_id"] == product_value].copy()
+    compare_lines = sales_lines.copy()
+    if channel_value != "all":
+        sales_lines = sales_lines[sales_lines["channel"] == channel_value].copy()
+
+    selected_name = "All products"
+    if selected_product:
+        selected_name = products_df.set_index("product_id").loc[product_value, "product_name"]
+
+    date_index = pd.DataFrame({"order_day": pd.date_range(start_day, end_day, freq="D")})
+    daily_sales = sales_lines.groupby("order_day", as_index=False).agg(
+        revenue=("line_total", "sum"),
+        orders=("transaction_id", "nunique"),
+        units=("quantity", "sum"),
+    )
+    daily_sales = date_index.merge(daily_sales, on="order_day", how="left").fillna(0)
+    daily_sales["aov"] = daily_sales["revenue"] / daily_sales["orders"].replace(0, pd.NA)
+    daily_sales["aov"] = daily_sales["aov"].fillna(0)
+
+    metric_map = {
+        "Revenue": ("revenue", "Revenue", "$,.0f"),
+        "Orders": ("orders", "Orders", ","),
+        "Units sold": ("units", "Units sold", ","),
+        "AOV": ("aov", "Average order value", "$,.0f"),
+    }
+    metric_col, metric_title, metric_format = metric_map[metric_picker.value]
+
     product_sales = (
+        sales_lines
+        .groupby(["product_id", "product_name", "category", "price_band"], as_index=False)
+        .agg(units=("quantity", "sum"), revenue=("line_total", "sum"), orders=("transaction_id", "nunique"))
+    )
+    all_product_sales = (
         order_items_df.merge(products_df, on="product_id", how="left")
         .groupby(["product_id", "product_name", "category", "price_band"], as_index=False)
         .agg(units=("quantity", "sum"), revenue=("line_total", "sum"))
     )
-    conversion_rate = len(online_orders) / len(sessions_df)
-    carts_created = int(sessions_df["reached_cart"].sum())
-    cart_abandonment = 1 - sessions_df["converted"].sum() / carts_created
-    average_order_value = authorized_orders["order_total"].mean()
-    repeat_purchase_rate = (customers_df["total_orders"] >= 2).mean()
-    top_sku_count = max(1, round(len(products_df) * 0.20))
-    revenue_concentration = product_sales.nlargest(top_sku_count, "revenue")["revenue"].sum() / product_sales["revenue"].sum()
 
-    def make_chart(spec):
-        return mo.ui.altair_chart(spec.properties(width="container", height=280))
+    filtered_sessions = sessions[sessions["session_day"].between(start_day, end_day)].copy()
+    carts_created = int(filtered_sessions["reached_cart"].sum())
+    converted_sessions = int(filtered_sessions["converted"].sum())
+    conversion_rate = converted_sessions / len(filtered_sessions) if len(filtered_sessions) else 0
+    cart_abandonment = 1 - converted_sessions / carts_created if carts_created else 0
+    repeat_purchase_rate = (customers_df["total_orders"] >= 2).mean()
+
+    sales_revenue = sales_lines["line_total"].sum()
+    sales_orders = sales_lines["transaction_id"].nunique()
+    sales_units = int(sales_lines["quantity"].sum())
+    average_order_value = sales_revenue / sales_orders if sales_orders else 0
+    top_sku_count = max(1, round(len(products_df) * 0.20))
+    revenue_concentration = all_product_sales.nlargest(top_sku_count, "revenue")["revenue"].sum() / all_product_sales["revenue"].sum()
+
+    def make_chart(spec, height=280):
+        return mo.ui.altair_chart(spec.properties(width="container", height=height))
 
     cards = mo.md(
-        f"""<div style="display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px;margin:12px 0 24px;">
-    <div style="border:1px solid #d8dee8;border-top:4px solid #176b87;padding:14px;"><strong>Conversion rate</strong><br><span style="font-size:1.7rem;">{conversion_rate:.1%}</span><br><small>Target: 1.5% to 2.0%</small></div>
-    <div style="border:1px solid #d8dee8;border-top:4px solid #d27d2d;padding:14px;"><strong>Average order value</strong><br><span style="font-size:1.7rem;">${average_order_value:,.0f}</span><br><small>Authorized orders</small></div>
-    <div style="border:1px solid #d8dee8;border-top:4px solid #176b87;padding:14px;"><strong>Cart abandonment</strong><br><span style="font-size:1.7rem;">{cart_abandonment:.1%}</span><br><small>Target: 70% or lower</small></div>
-    <div style="border:1px solid #d8dee8;border-top:4px solid #d27d2d;padding:14px;"><strong>Repeat purchase rate</strong><br><span style="font-size:1.7rem;">{repeat_purchase_rate:.1%}</span><br><small>Target: 20% or higher</small></div>
+        f"""<div style="display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:12px;margin:12px 0 20px;">
+    <div style="border:1px solid #d8dee8;border-top:4px solid #176b87;padding:14px;"><strong>Sales revenue</strong><br><span style="font-size:1.55rem;">${sales_revenue:,.0f}</span><br><small>{selected_name}</small></div>
+    <div style="border:1px solid #d8dee8;border-top:4px solid #d27d2d;padding:14px;"><strong>Orders</strong><br><span style="font-size:1.55rem;">{sales_orders:,}</span><br><small>Authorized purchases</small></div>
+    <div style="border:1px solid #d8dee8;border-top:4px solid #5b9a6f;padding:14px;"><strong>Units sold</strong><br><span style="font-size:1.55rem;">{sales_units:,}</span><br><small>Line-item quantity</small></div>
+    <div style="border:1px solid #d8dee8;border-top:4px solid #b4506d;padding:14px;"><strong>AOV</strong><br><span style="font-size:1.55rem;">${average_order_value:,.0f}</span><br><small>Revenue per order</small></div>
+    <div style="border:1px solid #d8dee8;border-top:4px solid #6a7892;padding:14px;"><strong>Conversion</strong><br><span style="font-size:1.55rem;">{conversion_rate:.1%}</span><br><small>Website sessions</small></div>
     </div>"""
     )
 
-    funnel_data = pd.DataFrame({"stage": ["All sessions", "Reached cart", "Completed purchase"], "count": [len(sessions_df), carts_created, int(sessions_df["converted"].sum())]})
-    funnel_chart = make_chart(alt.Chart(funnel_data).mark_bar(color="#176b87").encode(
-        x=alt.X("count:Q", title="Sessions"),
-        y=alt.Y("stage:N", sort=["All sessions", "Reached cart", "Completed purchase"], title=None),
-        tooltip=[alt.Tooltip("stage:N", title="Stage"), alt.Tooltip("count:Q", title="Sessions", format=",")],
-    ).properties(title="Website funnel"))
+    trend_chart = make_chart(alt.Chart(daily_sales).mark_area(line=True, color="#176b87", opacity=0.22).encode(
+        x=alt.X("order_day:T", title="Date"),
+        y=alt.Y(f"{metric_col}:Q", title=metric_title, axis=alt.Axis(format=metric_format)),
+        tooltip=[alt.Tooltip("order_day:T", title="Date", format="%b %d, %Y"), alt.Tooltip(f"{metric_col}:Q", title=metric_title, format=metric_format)],
+    ).properties(title=f"{metric_title} over time - {selected_name}"), height=320)
+
+    channel_data = sales_lines.groupby("channel", as_index=False).agg(
+        revenue=("line_total", "sum"),
+        orders=("transaction_id", "nunique"),
+    )
+    channel_data["aov"] = channel_data["revenue"] / channel_data["orders"]
+    channel_chart = make_chart(alt.Chart(channel_data).mark_bar().encode(
+        x=alt.X("channel:N", title="Channel"),
+        y=alt.Y("revenue:Q", title="Revenue", axis=alt.Axis(format="$,.0f")),
+        color=alt.Color("channel:N", title="Channel", scale=alt.Scale(range=["#176b87", "#d27d2d"])),
+        tooltip=[alt.Tooltip("channel:N", title="Channel"), alt.Tooltip("revenue:Q", title="Revenue", format="$,.2f"), alt.Tooltip("orders:Q", title="Orders", format=","), alt.Tooltip("aov:Q", title="AOV", format="$,.2f")],
+    ).properties(title="Revenue by channel"))
+
+    channel_compare = compare_lines.groupby("channel", as_index=False).agg(
+        revenue=("line_total", "sum"),
+        orders=("transaction_id", "nunique"),
+        units=("quantity", "sum"),
+    )
+    channel_compare["aov"] = channel_compare["revenue"] / channel_compare["orders"]
+    channel_compare["revenue_share"] = channel_compare["revenue"] / channel_compare["revenue"].sum()
+    comparison_chart = make_chart(alt.Chart(channel_compare).mark_bar().encode(
+        x=alt.X("channel:N", title="Channel"),
+        y=alt.Y("revenue:Q", title="Item revenue", axis=alt.Axis(format="$,.0f")),
+        color=alt.Color("channel:N", title="Channel", scale=alt.Scale(range=["#176b87", "#d27d2d"])),
+        tooltip=[alt.Tooltip("channel:N", title="Channel"), alt.Tooltip("revenue:Q", title="Item revenue", format="$,.2f"), alt.Tooltip("revenue_share:Q", title="Revenue share", format=".1%"), alt.Tooltip("orders:Q", title="Orders", format=","), alt.Tooltip("units:Q", title="Units", format=","), alt.Tooltip("aov:Q", title="AOV", format="$,.2f")],
+    ).properties(title=f"Online vs in-store revenue - {selected_name}"))
+
+    channel_monthly = compare_lines.copy()
+    channel_monthly["month"] = channel_monthly["order_day"].dt.to_period("M").dt.to_timestamp()
+    channel_monthly = channel_monthly.groupby(["month", "channel"], as_index=False).agg(
+        revenue=("line_total", "sum"),
+        orders=("transaction_id", "nunique"),
+    )
+    channel_trend_chart = make_chart(alt.Chart(channel_monthly).mark_line(point=True).encode(
+        x=alt.X("month:T", title="Month"),
+        y=alt.Y("revenue:Q", title="Item revenue", axis=alt.Axis(format="$,.0f")),
+        color=alt.Color("channel:N", title="Channel", scale=alt.Scale(range=["#176b87", "#d27d2d"])),
+        tooltip=[alt.Tooltip("month:T", title="Month", format="%b %Y"), alt.Tooltip("channel:N", title="Channel"), alt.Tooltip("revenue:Q", title="Item revenue", format="$,.2f"), alt.Tooltip("orders:Q", title="Orders", format=",")],
+    ).properties(title="Monthly revenue by channel"), height=320)
+
+    category_channel = compare_lines.groupby(["category", "channel"], as_index=False).agg(
+        revenue=("line_total", "sum"),
+        units=("quantity", "sum"),
+    )
+    category_channel_chart = make_chart(alt.Chart(category_channel).mark_bar().encode(
+        x=alt.X("category:N", title="Category"),
+        y=alt.Y("revenue:Q", title="Item revenue", axis=alt.Axis(format="$,.0f")),
+        color=alt.Color("channel:N", title="Channel", scale=alt.Scale(range=["#176b87", "#d27d2d"])),
+        xOffset="channel:N",
+        tooltip=[alt.Tooltip("category:N", title="Category"), alt.Tooltip("channel:N", title="Channel"), alt.Tooltip("revenue:Q", title="Item revenue", format="$,.2f"), alt.Tooltip("units:Q", title="Units", format=",")],
+    ).properties(title="Category mix by channel"), height=320)
+
+    comparison_note = mo.md(
+        "**Channel comparison:** date and product filters apply here, but the channel filter is ignored so online and in-store stay side by side."
+    )
+
+    weekday_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    heatmap_data = sales_lines.groupby(["day_of_week", "hour_of_day"], as_index=False).agg(
+        revenue=("line_total", "sum"),
+        orders=("transaction_id", "nunique"),
+    )
+    heatmap_chart = make_chart(alt.Chart(heatmap_data).mark_rect().encode(
+        x=alt.X("hour_of_day:O", title="Hour of day"),
+        y=alt.Y("day_of_week:N", sort=weekday_order, title=None),
+        color=alt.Color("revenue:Q", title="Revenue", scale=alt.Scale(range=["#f4f6f8", "#176b87"])),
+        tooltip=[alt.Tooltip("day_of_week:N", title="Day"), alt.Tooltip("hour_of_day:O", title="Hour"), alt.Tooltip("revenue:Q", title="Revenue", format="$,.2f"), alt.Tooltip("orders:Q", title="Orders", format=",")],
+    ).properties(title="When sales happen"))
 
     price_band_data = product_sales.groupby("price_band", as_index=False).agg(revenue=("revenue", "sum"), units=("units", "sum"))
     price_chart = make_chart(alt.Chart(price_band_data).mark_bar(color="#d27d2d").encode(
@@ -816,29 +1044,37 @@ def _(
         tooltip=[alt.Tooltip("price_band:N", title="Price band"), alt.Tooltip("revenue:Q", title="Revenue", format="$,.2f"), alt.Tooltip("units:Q", title="Units sold", format=",")],
     ).properties(title="Revenue by price band"))
 
-    top_sellers = product_sales.nlargest(10, "revenue").sort_values("revenue")
+    top_sellers = product_sales.nlargest(top_n, "revenue").sort_values("revenue")
     top_sellers_chart = make_chart(alt.Chart(top_sellers).mark_bar(color="#176b87").encode(
         x=alt.X("revenue:Q", title="Revenue", axis=alt.Axis(format="$,.0f")),
         y=alt.Y("product_name:N", sort=None, title=None),
-        tooltip=[alt.Tooltip("product_name:N", title="Product"), alt.Tooltip("units:Q", title="Units sold", format=","), alt.Tooltip("revenue:Q", title="Revenue", format="$,.2f")],
-    ).properties(title="Top 10 products by revenue"))
+        tooltip=[alt.Tooltip("product_name:N", title="Product"), alt.Tooltip("category:N", title="Category"), alt.Tooltip("units:Q", title="Units sold", format=","), alt.Tooltip("revenue:Q", title="Revenue", format="$,.2f")],
+    ).properties(title=f"Top {top_n} products by revenue"))
 
-    category_data = product_sales.groupby("category", as_index=False).agg(revenue=("revenue", "sum"))
+    category_data = product_sales.groupby("category", as_index=False).agg(revenue=("revenue", "sum"), units=("units", "sum"))
     category_data["share"] = category_data["revenue"] / category_data["revenue"].sum()
     category_chart = make_chart(alt.Chart(category_data).mark_arc(innerRadius=55).encode(
         theta="revenue:Q",
         color=alt.Color("category:N", title="Category", scale=alt.Scale(range=["#176b87", "#d27d2d", "#5b9a6f", "#b4506d", "#6a7892"])),
-        tooltip=[alt.Tooltip("category:N", title="Category"), alt.Tooltip("revenue:Q", title="Revenue", format="$,.2f"), alt.Tooltip("share:Q", title="Revenue share", format=".1%")],
+        tooltip=[alt.Tooltip("category:N", title="Category"), alt.Tooltip("revenue:Q", title="Revenue", format="$,.2f"), alt.Tooltip("units:Q", title="Units sold", format=","), alt.Tooltip("share:Q", title="Revenue share", format=".1%")],
     ).properties(title="Category mix by revenue"))
 
-    age_orders = authorized_orders.dropna(subset=["customer_id"]).merge(customers_df[["customer_id", "age_band"]], on="customer_id", how="left").dropna(subset=["age_band"])
-    age_data = age_orders.groupby("age_band", as_index=False).agg(orders=("transaction_id", "count"), aov=("order_total", "mean"))
+    age_orders = authorized_orders.dropna(subset=["customer_id"]).merge(customers_df[["customer_id", "age_band", "acquisition_source"]], on="customer_id", how="left")
+    age_data = age_orders.dropna(subset=["age_band"]).groupby("age_band", as_index=False).agg(orders=("transaction_id", "count"), aov=("order_total", "mean"))
     age_chart = make_chart(alt.Chart(age_data).mark_bar(color="#5b9a6f").encode(
         x=alt.X("age_band:N", title="Age band", sort=["18-24", "25-34", "35-44", "45+"]),
         y=alt.Y("aov:Q", title="Average order value", axis=alt.Axis(format="$,.0f")),
         tooltip=[alt.Tooltip("age_band:N", title="Age band"), alt.Tooltip("orders:Q", title="Orders", format=","), alt.Tooltip("aov:Q", title="AOV", format="$,.2f")],
     ).properties(title="Customer value by age band"))
 
+    source_data = age_orders.groupby("acquisition_source", dropna=True, as_index=False).agg(revenue=("order_total", "sum"), orders=("transaction_id", "count"))
+    source_chart = make_chart(alt.Chart(source_data).mark_bar(color="#6a7892").encode(
+        x=alt.X("revenue:Q", title="Revenue", axis=alt.Axis(format="$,.0f")),
+        y=alt.Y("acquisition_source:N", sort="-x", title="Acquisition source"),
+        tooltip=[alt.Tooltip("acquisition_source:N", title="Source"), alt.Tooltip("revenue:Q", title="Revenue", format="$,.2f"), alt.Tooltip("orders:Q", title="Orders", format=",")],
+    ).properties(title="Revenue by customer source"))
+
+    online_orders = filtered_orders[filtered_orders["channel"] == "online"].copy()
     location_data = online_orders.groupby("shipping_state", dropna=True, as_index=False).agg(orders=("transaction_id", "count"), revenue=("order_total", "sum")).sort_values("revenue", ascending=False)
     location_chart = make_chart(alt.Chart(location_data).mark_bar(color="#b4506d").encode(
         x=alt.X("shipping_state:N", title="Shipping state"),
@@ -846,10 +1082,36 @@ def _(
         tooltip=[alt.Tooltip("shipping_state:N", title="State"), alt.Tooltip("orders:Q", title="Orders", format=","), alt.Tooltip("revenue:Q", title="Revenue", format="$,.2f")],
     ).properties(title="Online sales by shipping state"))
 
-    pricing_view = mo.vstack([price_chart, mo.md("**Price elasticity:** not available yet. It requires product-level price changes and enough history to compare demand before and after each change.")])
-    products_view = mo.vstack([top_sellers_chart, category_chart, mo.md(f"**Revenue concentration:** the top {top_sku_count} products, 20% of the catalog, contribute **{revenue_concentration:.1%}** of item revenue.")])
-    customers_view = mo.vstack([age_chart, location_chart, mo.md("Age analysis excludes customers without a recorded birthdate. Location is based on online shipping destinations.")])
-    mo.vstack([cards, mo.ui.tabs({"Funnel": funnel_chart, "Pricing": pricing_view, "Products": products_view, "Customers": customers_view})])
+    funnel_data = pd.DataFrame({"stage": ["All sessions", "Reached cart", "Completed purchase"], "count": [len(filtered_sessions), carts_created, converted_sessions]})
+    funnel_chart = make_chart(alt.Chart(funnel_data).mark_bar(color="#176b87").encode(
+        x=alt.X("count:Q", title="Sessions"),
+        y=alt.Y("stage:N", sort=["All sessions", "Reached cart", "Completed purchase"], title=None),
+        tooltip=[alt.Tooltip("stage:N", title="Stage"), alt.Tooltip("count:Q", title="Sessions", format=",")],
+    ).properties(title="Website funnel"))
+
+    device_data = filtered_sessions.groupby("device", as_index=False).agg(sessions=("session_id", "count"), converted=("converted", "sum"))
+    device_data["conversion_rate"] = device_data["converted"] / device_data["sessions"]
+    device_chart = make_chart(alt.Chart(device_data).mark_bar(color="#d27d2d").encode(
+        x=alt.X("device:N", title="Device"),
+        y=alt.Y("conversion_rate:Q", title="Conversion rate", axis=alt.Axis(format=".1%")),
+        tooltip=[alt.Tooltip("device:N", title="Device"), alt.Tooltip("sessions:Q", title="Sessions", format=","), alt.Tooltip("conversion_rate:Q", title="Conversion", format=".2%")],
+    ).properties(title="Conversion by device"))
+
+    traffic_data = filtered_sessions.groupby("traffic_source", as_index=False).agg(sessions=("session_id", "count"), carts=("reached_cart", "sum"), converted=("converted", "sum"))
+    traffic_data["cart_rate"] = traffic_data["carts"] / traffic_data["sessions"]
+    traffic_chart = make_chart(alt.Chart(traffic_data).mark_bar(color="#5b9a6f").encode(
+        x=alt.X("cart_rate:Q", title="Reached cart rate", axis=alt.Axis(format=".1%")),
+        y=alt.Y("traffic_source:N", sort="-x", title="Traffic source"),
+        tooltip=[alt.Tooltip("traffic_source:N", title="Source"), alt.Tooltip("sessions:Q", title="Sessions", format=","), alt.Tooltip("cart_rate:Q", title="Reached cart", format=".1%"), alt.Tooltip("converted:Q", title="Orders", format=",")],
+    ).properties(title="Cart interest by traffic source"))
+
+    overview_view = mo.vstack([cards, trend_chart, channel_chart, heatmap_chart])
+    comparison_view = mo.vstack([comparison_chart, channel_trend_chart, category_channel_chart, comparison_note])
+    products_view = mo.vstack([top_sellers_chart, category_chart, price_chart, mo.md(f"**Revenue concentration:** the top {top_sku_count} products, 20% of the catalog, contribute **{revenue_concentration:.1%}** of item revenue.")])
+    customers_view = mo.vstack([age_chart, source_chart, location_chart, mo.md(f"**Repeat purchase rate:** {repeat_purchase_rate:.1%}. Age analysis excludes customers without a recorded birthdate.")])
+    funnel_view = mo.vstack([funnel_chart, device_chart, traffic_chart, mo.md(f"**Cart abandonment:** {cart_abandonment:.1%}. Funnel metrics use website sessions only.")])
+    kpi_tabs = mo.ui.tabs({"Overview": overview_view, "Channel compare": comparison_view, "Products": products_view, "Customers": customers_view, "Funnel": funnel_view})
+    mo.vstack([kpi_controls, kpi_tabs], gap=1.0)
     return
 
 

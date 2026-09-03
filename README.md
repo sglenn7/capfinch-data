@@ -24,6 +24,30 @@ The dataset is organized around two anchor keys:
 These join together via `customer_id`, which is a foreign key inside `orders`. This lets us
 analyze the data both per-sale and per-customer.
 
+## Client-facing Marimo app
+
+For client sharing, run the notebook in Marimo app mode or export it without showing code. App mode
+is read-only and does not send notebook source code to the browser unless `--include-code` is
+passed, but it requires a Python server.
+
+```bash
+.venv/bin/python -m marimo run client_data_marimo.py
+```
+
+For GitHub Pages with live controls, export a WASM-powered app in run mode. This hides code in the
+page UI, but the app runs in the browser, so it should not be treated as source-private:
+
+```bash
+.venv/bin/python -m marimo export html-wasm client_data_marimo.py -o site --mode run --no-show-code -f
+```
+
+For a lighter static snapshot that does not include notebook code, export plain HTML. Use this when
+source privacy matters more than live Python-backed controls:
+
+```bash
+.venv/bin/python -m marimo export html client_data_marimo.py -o index.html --no-include-code -f
+```
+
 ## Entity relationship diagram
 
 Also available as images for slides and docs: [erd.svg](erd.svg) (vector) and [erd.png](erd.png)
