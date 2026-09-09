@@ -1,3 +1,13 @@
+# /// script
+# requires-python = ">=3.14"
+# dependencies = [
+#     "altair==6.2.2",
+#     "faker==40.38.0",
+#     "marimo>=0.24.0",
+#     "numpy==2.5.3",
+#     "pandas==3.0.5",
+# ]
+# ///
 import marimo
 
 __generated_with = "0.24.0"
@@ -14,12 +24,11 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    # CapFinch post-launch dashboard
+    # CapFinch Synthetic Data
 
-    "
-        "This sample combines CapFinch's in-store sales history with modeled activity from its new "
-        "e-commerce website. It illustrates the measures we will use to monitor commercial "
-        "performance after launch.
+    This sample combines CapFinch's in-store sales history with modeled activity from its new
+    e-commerce website. It illustrates the measures we will use to monitor commercial
+    performance after launch.
     """)
     return
 
